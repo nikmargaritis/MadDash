@@ -451,37 +451,41 @@ function ProfileTab({ profile, setProfile }) {
 }
 
 // ─── STYLES ──────────────────────────────────────────────────────────────────
+// UW Madison — proper Badger Red on warm white
 const C = {
-  bg: "#0a0a0f",
-  surface: "#13131a",
-  surface2: "#1c1c27",
-  accent: "#e8ff47",
-  accent2: "#ff6b35",
-  scenic: "#4ade80",
-  fast: "#facc15",
-  text: "#f0f0f8",
-  muted: "#6b6b7e",
-  border: "#2a2a3a",
+  bg: "#faf7f4",           // warm off-white
+  surface: "#f2ede8",      // warm light tan
+  surface2: "#e9e2da",     // slightly deeper warm tone
+  accent: "#9B0000",       // UW Madison Red
+  accentDark: "#6e0000",   // deeper red
+  accentLight: "#f5eaea",  // soft warm blush tint
+  scenic: "#4a7c59",       // muted sage green
+  fast: "#9B0000",
+  text: "#2e2620",         // warm dark brown
+  muted: "#8a7d75",        // warm gray-brown
+  border: "#ddd5cc",       // warm beige border
+  navBg: "#9B0000",        // UW Madison Red nav
+  headerBg: "#9B0000",     // UW Madison Red header
 };
 
 const styles = {
   app: { minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'DM Mono', 'Courier New', monospace", display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", position: "relative" },
-  header: { padding: "24px 20px 12px", borderBottom: `1px solid ${C.border}`, background: `linear-gradient(135deg, ${C.bg} 0%, #0f0f1e 100%)` },
+  header: { padding: "24px 20px 12px", borderBottom: `3px solid ${C.accentDark}`, background: C.headerBg },
   logo: { fontSize: 28, letterSpacing: "-1px", lineHeight: 1 },
-  logoMad: { color: C.accent, fontWeight: 900 },
-  logoDash: { color: C.text, fontWeight: 300 },
-  headerSub: { fontSize: 10, color: C.muted, letterSpacing: 3, marginTop: 4, textTransform: "uppercase" },
+  logoMad: { color: "#ffffff", fontWeight: 900 },
+  logoDash: { color: "#ffd0d0", fontWeight: 300 },
+  headerSub: { fontSize: 10, color: "#ffd0d0", letterSpacing: 3, marginTop: 4, textTransform: "uppercase" },
   main: { flex: 1, overflowY: "auto", paddingBottom: 80 },
   tabContent: { padding: "20px 16px" },
-  tabTitle: { fontSize: 22, fontWeight: 700, margin: "0 0 20px", letterSpacing: "-0.5px" },
-  nav: { position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: C.surface, borderTop: `1px solid ${C.border}`, display: "flex", padding: "8px 0 12px" },
-  navBtn: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 10, letterSpacing: 1, position: "relative", padding: "6px 0" },
-  navBtnActive: { color: C.accent },
+  tabTitle: { fontSize: 22, fontWeight: 700, margin: "0 0 20px", letterSpacing: "-0.5px", color: C.text },
+  nav: { position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: C.navBg, borderTop: `2px solid ${C.accentDark}`, display: "flex", padding: "8px 0 12px" },
+  navBtn: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", color: "rgba(255,255,255,0.55)", cursor: "pointer", fontSize: 10, letterSpacing: 1, position: "relative", padding: "6px 0" },
+  navBtnActive: { color: "#ffffff" },
   navLabel: { fontSize: 9, letterSpacing: 1, textTransform: "uppercase" },
-  navDot: { position: "absolute", bottom: 0, width: 4, height: 4, borderRadius: "50%", background: C.accent },
+  navDot: { position: "absolute", bottom: 0, width: 4, height: 4, borderRadius: "50%", background: "#ffffff" },
   card: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 16 },
   cardLabel: { fontSize: 9, letterSpacing: 3, color: C.muted, textTransform: "uppercase", marginBottom: 12 },
-  input: { width: "100%", background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, padding: "10px 12px", boxSizing: "border-box", fontFamily: "inherit", outline: "none", marginBottom: 10 },
+  input: { width: "100%", background: "#ffffff", border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, padding: "10px 12px", boxSizing: "border-box", fontFamily: "inherit", outline: "none", marginBottom: 10 },
   inputRow: { display: "flex", gap: 10 },
   inputGroup: { flex: 1, display: "flex", flexDirection: "column" },
   inputLabel: { fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6, textTransform: "uppercase" },
@@ -494,31 +498,31 @@ const styles = {
   mapText: { fontSize: 13, color: C.text, marginTop: 8, display: "block" },
   mapSub: { fontSize: 11, color: C.muted, marginTop: 4, display: "block", maxWidth: 200 },
   filterRow: { display: "flex", gap: 8, marginBottom: 16 },
-  filterBtn: { flex: 1, background: C.surface, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "8px 0", fontSize: 11, cursor: "pointer", letterSpacing: 1 },
-  filterBtnActive: { background: C.accent, color: "#000", borderColor: C.accent, fontWeight: 700 },
+  filterBtn: { flex: 1, background: C.surface, border: `1.5px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "8px 0", fontSize: 11, cursor: "pointer", letterSpacing: 1 },
+  filterBtnActive: { background: C.accent, color: "#fff", borderColor: C.accent, fontWeight: 700 },
   routeList: { display: "flex", flexDirection: "column", gap: 10 },
-  routeCard: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14, textAlign: "left", cursor: "pointer", color: C.text, width: "100%", transition: "all 0.15s" },
-  routeCardSelected: { border: `2px solid ${C.accent}`, background: `${C.accent}11` },
+  routeCard: { background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: 14, textAlign: "left", cursor: "pointer", color: C.text, width: "100%", transition: "all 0.15s" },
+  routeCardSelected: { border: `2px solid ${C.accent}`, background: C.accentLight },
   routeCardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
   routeName: { fontSize: 16, fontWeight: 700, marginBottom: 4 },
   routeMeta: { fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 8 },
   routeTag: { fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 600, letterSpacing: 0.5 },
-  tagScenic: { background: "#4ade8022", color: C.scenic },
-  tagFast: { background: "#facc1522", color: C.fast },
+  tagScenic: { background: "#e8f5ea", color: C.scenic },
+  tagFast: { background: C.accentLight, color: C.accent },
   routeDesc: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
-  ctaBtn: { width: "100%", background: C.accent, color: "#000", fontWeight: 900, fontSize: 15, padding: "14px", borderRadius: 12, border: "none", cursor: "pointer", letterSpacing: 1, marginTop: 16, fontFamily: "inherit" },
-  timerCard: { background: `linear-gradient(135deg, ${C.surface} 0%, #1a1a2e 100%)`, border: `1px solid ${C.border}`, borderRadius: 20, padding: "32px 20px", textAlign: "center", marginBottom: 20 },
+  ctaBtn: { width: "100%", background: C.accent, color: "#fff", fontWeight: 900, fontSize: 15, padding: "14px", borderRadius: 12, border: "none", cursor: "pointer", letterSpacing: 1, marginTop: 16, fontFamily: "inherit", boxShadow: `0 4px 14px ${C.accent}55` },
+  timerCard: { background: `linear-gradient(135deg, ${C.accentLight} 0%, #fff5f5 100%)`, border: `2px solid ${C.accent}33`, borderRadius: 20, padding: "32px 20px", textAlign: "center", marginBottom: 20 },
   timerTime: { fontSize: 64, fontWeight: 900, letterSpacing: -2, color: C.accent, lineHeight: 1 },
   timerLabel: { fontSize: 11, letterSpacing: 4, color: C.muted, marginTop: 8, marginBottom: 24, textTransform: "uppercase" },
-  bigBtn: { width: 72, height: 72, borderRadius: "50%", background: C.accent, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#000", transition: "transform 0.1s", boxShadow: `0 0 30px ${C.accent}66` },
-  bigBtnStop: { background: "#ff4444", boxShadow: "0 0 30px #ff444466" },
+  bigBtn: { width: 72, height: 72, borderRadius: "50%", background: C.accent, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", transition: "transform 0.1s", boxShadow: `0 0 30px ${C.accent}55` },
+  bigBtnStop: { background: C.accentDark, boxShadow: `0 0 30px ${C.accentDark}66` },
   routeSummary: { display: "flex", gap: 20, fontSize: 13, color: C.muted, marginTop: 4 },
-  calCard: { background: `linear-gradient(135deg, ${C.accent2}22, ${C.accent}11)`, border: `1px solid ${C.accent2}44`, borderRadius: 16, padding: 24, textAlign: "center" },
-  calNum: { fontSize: 56, fontWeight: 900, color: C.accent2, letterSpacing: -2, lineHeight: 1 },
+  calCard: { background: `linear-gradient(135deg, ${C.accentLight}, #fff)`, border: `1.5px solid ${C.accent}44`, borderRadius: 16, padding: 24, textAlign: "center" },
+  calNum: { fontSize: 56, fontWeight: 900, color: C.accent, letterSpacing: -2, lineHeight: 1 },
   calLabel: { fontSize: 10, letterSpacing: 3, color: C.muted, marginTop: 4, textTransform: "uppercase" },
   calSub: { fontSize: 11, color: C.muted, marginTop: 8 },
   statGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 },
-  statBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, textAlign: "center" },
+  statBox: { background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: 16, textAlign: "center" },
   statNum: { fontSize: 32, fontWeight: 900, color: C.accent, letterSpacing: -1 },
   statLabel: { fontSize: 10, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginTop: 4 },
   emptyState: { textAlign: "center", padding: "40px 20px", color: C.muted },
@@ -527,16 +531,16 @@ const styles = {
   historyRoute: { fontWeight: 700, fontSize: 14 },
   historyDate: { fontSize: 11, color: C.muted },
   historyMeta: { display: "flex", gap: 16, fontSize: 12, color: C.muted },
-  infoCard: { background: C.surface2, borderRadius: 12, padding: 16, marginBottom: 16 },
+  infoCard: { background: C.accentLight, borderRadius: 12, padding: 16, marginBottom: 16, border: `1px solid ${C.accent}22` },
   apiNote: { fontSize: 11, color: C.muted, lineHeight: 1.6, marginTop: 4 },
   infoText: { fontSize: 13, color: C.muted, lineHeight: 1.7, margin: 0 },
 };
 
 const globalCSS = `
   * { box-sizing: border-box; }
-  body { margin: 0; background: #0a0a0f; }
-  input:focus { border-color: #e8ff47 !important; outline: none; }
+  body { margin: 0; background: #faf7f4; }
+  input:focus { border-color: #9B0000 !important; outline: none; box-shadow: 0 0 0 3px rgba(155,0,0,0.10); }
   button:active { transform: scale(0.97); }
-  :root { --text-muted: #6b6b7e; }
+  :root { --text-muted: #8a7d75; }
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
 `;

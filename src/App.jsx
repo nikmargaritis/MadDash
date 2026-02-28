@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyDICagLUEDcQWKUGIa63SZFvg8Y0W1_5A4";
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 // ─── HAVERSINE DISTANCE ──────────────────────────────────────────────────────
 function haversineKm(lat1, lon1, lat2, lon2) {

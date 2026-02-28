@@ -1,10 +1,10 @@
-# 🏃 MadDash – Health & Lifestyle Run Tracker
+# MadDash – Health & Lifestyle Run Tracker
 
 A React app for tracking runs with route selection, calorie estimation, and Google Maps integration.
 
 ---
 
-## 🚀 Step-by-Step Setup
+## Step-by-Step Setup
 
 ### Step 1 – Install Node.js
 Download from https://nodejs.org (LTS version recommended, v18+).
@@ -24,7 +24,7 @@ Open http://localhost:5173 in your browser. You should see the MadDash app!
 
 ---
 
-## 🗺️ Google Maps API Setup
+## Google Maps API Setup
 
 ### Step 4 – Get a Google Maps API Key
 1. Go to https://console.cloud.google.com
@@ -91,7 +91,7 @@ useEffect(() => {
 
 ---
 
-## 📡 GPS Live Tracking (Strava-style)
+## GPS Live Tracking (Strava-style)
 
 To track the user while running:
 
@@ -118,7 +118,7 @@ For full Strava-like tracking, consider:
 
 ---
 
-## 🏗️ Build for Production
+## Build for Production
 ```bash
 npm run build
 ```
@@ -126,7 +126,7 @@ Output goes to `/dist`. Deploy to Vercel, Netlify, or any static host.
 
 ---
 
-## 🧮 Calorie Formula
+## Calorie Formula
 MadDash uses MET values (Metabolic Equivalent of Task):
 
 ```

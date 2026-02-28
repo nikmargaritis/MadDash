@@ -1,6 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, createContext, useContext } from "react";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+
+const ThemeContext = createContext(null);
+function useTheme() {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) throw new Error("useTheme must be used inside ThemeProvider");
+  return ctx;
+}
 
 // ─── HAVERSINE DISTANCE ──────────────────────────────────────────────────────
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -48,6 +55,8 @@ const Icons = {
   Play: () => (<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="5,3 19,12 5,21"/></svg>),
   Stop: () => (<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>),
   Location: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 00-8 8c0 5.25 8 13 8 13s8-7.75 8-13a8 8 0 00-8-8z"/></svg>),
+  Moon: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>),
+  Sun: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>),
 };
 
 // ─── PRESET MADISON ROUTES ───────────────────────────────────────────────────
@@ -60,6 +69,9 @@ const PRESET_ROUTES = [
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("madDashDark")) === true; } catch { return false; }
+  });
   const [tab, setTab] = useState("routes");
   const [profile, setProfile] = useState({ name: "Runner", weight: 70, age: 28 });
   const [selectedRoute, setSelectedRoute] = useState(null);
@@ -75,6 +87,14 @@ export default function App() {
   const timerRef = useRef(null);
   const gpsWatchRef = useRef(null);
   const gpsPathRef = useRef([]);
+
+  useEffect(() => {
+    localStorage.setItem("madDashDark", JSON.stringify(darkMode));
+  }, [darkMode]);
+
+  const theme = darkMode ? darkTheme : lightTheme;
+  const styles = getStyles(theme);
+  const themeValue = { styles, darkMode, setDarkMode };
 
   useEffect(() => {
     loadGoogleMaps().then(() => setMapsReady(true)).catch(console.error);
@@ -163,11 +183,20 @@ export default function App() {
   };
 
   return (
-    <div style={styles.app}>
-      <style>{globalCSS}</style>
+    <ThemeContext.Provider value={themeValue}>
+    <div style={styles.app} data-theme={darkMode ? "dark" : "light"}>
+      <style>{getGlobalCSS(darkMode)}</style>
       <header style={styles.header}>
-        <div style={styles.logo}><span style={styles.logoMad}>MAD</span><span style={styles.logoDash}>DASH</span></div>
-        <div style={styles.headerSub}>Health &amp; Lifestyle Tracker · UW Madison</div>
+        <div style={styles.headerRow}>
+          <div>
+            <div style={styles.logo}><span style={styles.logoMad}>MAD</span><span style={styles.logoDash}>DASH</span></div>
+            <div style={styles.headerSub}>Health &amp; Lifestyle Tracker · UW Madison</div>
+          </div>
+          <button type="button" style={styles.themeBtn} onClick={() => setDarkMode(d => !d)} title={darkMode ? "Switch to light mode" : "Switch to dark mode"}>
+            {darkMode ? <Icons.Sun /> : <Icons.Moon />}
+            <span>{darkMode ? "Light" : "Dark"}</span>
+          </button>
+        </div>
       </header>
       <main style={styles.main}>
         {tab === "routes" && (
@@ -206,11 +235,13 @@ export default function App() {
         ))}
       </nav>
     </div>
+    </ThemeContext.Provider>
   );
 }
 
 // ─── MAP COMPONENT ────────────────────────────────────────────────────────────
 function LiveMap({ startLocation, endLocation, mapsReady, height = 220 }) {
+  const { styles } = useTheme();
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const directionsRendererRef = useRef(null);
@@ -264,6 +295,7 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220 }) {
 
 // ─── PLACES AUTOCOMPLETE INPUT ────────────────────────────────────────────────
 function PlacesInput({ value, onChange, placeholder, mapsReady }) {
+  const { styles } = useTheme();
   const inputRef = useRef(null);
   const acRef = useRef(null);
 
@@ -296,6 +328,7 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
 
 // ─── ROUTES TAB ───────────────────────────────────────────────────────────────
 function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocation, setStartLocation, endLocation, setEndLocation, mapsReady, onGoToRun }) {
+  const { styles } = useTheme();
   return (
     <div style={styles.tabContent}>
       <h2 style={styles.tabTitle}>Choose Your Route</h2>
@@ -342,6 +375,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
 
 // ─── RUN TAB ──────────────────────────────────────────────────────────────────
 function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runElapsed, liveDistanceKm, livePace, startRun, stopRun, fmtTime, mapsReady, startLocation, endLocation }) {
+  const { styles } = useTheme();
   const liveCals = calcCalories({ weightKg: profile.weight, durationMin: runElapsed / 60, distanceKm: Math.max(liveDistanceKm, 0.01) });
 
   return (
@@ -403,6 +437,7 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
 
 // ─── STATS TAB ────────────────────────────────────────────────────────────────
 function StatsTab({ history }) {
+  const { styles } = useTheme();
   const totalCals = history.reduce((a, r) => a + r.calories, 0);
   const totalKm = history.reduce((a, r) => a + r.distanceKm, 0);
   const totalMins = history.reduce((a, r) => a + r.durationMin, 0);
@@ -442,6 +477,7 @@ function StatsTab({ history }) {
 
 // ─── PROFILE TAB ──────────────────────────────────────────────────────────────
 function ProfileTab({ profile, setProfile }) {
+  const { styles } = useTheme();
   const set = (k, v) => setProfile(p => ({ ...p, [k]: v }));
   return (
     <div style={styles.tabContent}>
@@ -484,95 +520,112 @@ function ProfileTab({ profile, setProfile }) {
 }
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
-const C = {
+const lightTheme = {
   bg: "#faf7f4", surface: "#f2ede8", surface2: "#e9e2da",
   accent: "#9B0000", accentDark: "#6e0000", accentLight: "#f5eaea",
   scenic: "#4a7c59", text: "#2e2620", muted: "#8a7d75",
   border: "#ddd5cc", navBg: "#9B0000", headerBg: "#9B0000",
+  inputBg: "#fff", timerGrad: "linear-gradient(135deg,#f5eaea 0%,#fffaf9 100%)",
+  liveStatBg: "#fff", calGrad: "linear-gradient(135deg,#f5eaea,#faf7f4)",
+  pacHover: "#f5eaea", pacMatch: "#9B0000",
 };
 
-const styles = {
-  app: { minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'DM Mono','Courier New',monospace", display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", position: "relative" },
-  header: { padding: "24px 20px 12px", borderBottom: `3px solid ${C.accentDark}`, background: C.headerBg },
-  logo: { fontSize: 28, letterSpacing: "-1px", lineHeight: 1 },
-  logoMad: { color: "#fff", fontWeight: 900 },
-  logoDash: { color: "#ffd0d0", fontWeight: 300 },
-  headerSub: { fontSize: 10, color: "#ffd0d0", letterSpacing: 2, marginTop: 4, textTransform: "uppercase" },
-  main: { flex: 1, overflowY: "auto", paddingBottom: 80 },
-  tabContent: { padding: "20px 16px" },
-  tabTitle: { fontSize: 22, fontWeight: 700, margin: "0 0 20px", letterSpacing: "-0.5px" },
-  nav: { position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: C.navBg, borderTop: `2px solid ${C.accentDark}`, display: "flex", padding: "8px 0 12px" },
-  navBtn: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", color: "rgba(255,255,255,0.55)", cursor: "pointer", fontSize: 10, letterSpacing: 1, position: "relative", padding: "6px 0" },
-  navBtnActive: { color: "#fff" },
-  navLabel: { fontSize: 9, letterSpacing: 1, textTransform: "uppercase" },
-  navDot: { position: "absolute", bottom: 0, width: 4, height: 4, borderRadius: "50%", background: "#fff" },
-  card: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 16 },
-  cardLabel: { fontSize: 9, letterSpacing: 3, color: C.muted, textTransform: "uppercase", marginBottom: 12 },
-  input: { width: "100%", background: "#fff", border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, padding: "10px 12px", boxSizing: "border-box", fontFamily: "inherit", outline: "none", marginBottom: 10 },
-  inputIcon: { position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.muted, pointerEvents: "none", display: "flex", alignItems: "center" },
-  inputRow: { display: "flex", gap: 10 },
-  inputGroup: { flex: 1, display: "flex", flexDirection: "column" },
-  inputLabel: { fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6, textTransform: "uppercase" },
-  locationDivider: { display: "flex", alignItems: "center", gap: 8, margin: "4px 0 10px", color: C.muted },
-  routeLine: { flex: 1, height: 1, background: C.border },
-  arrowDown: { fontSize: 14 },
-  mapPlaceholder: { background: C.surface2, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", border: `1px dashed ${C.border}`, marginTop: 8 },
-  mapInner: { textAlign: "center" },
-  mapIcon: { fontSize: 32, display: "block" },
-  mapText: { fontSize: 13, color: C.text, marginTop: 8, display: "block" },
-  filterRow: { display: "flex", gap: 8, marginBottom: 12 },
-  filterBtn: { flex: 1, background: C.surface, border: `1.5px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "8px 0", fontSize: 11, cursor: "pointer", letterSpacing: 1 },
-  filterBtnActive: { background: C.accent, color: "#fff", borderColor: C.accent, fontWeight: 700 },
-  routeList: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 },
-  routeCard: { background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: 14, textAlign: "left", cursor: "pointer", color: C.text, width: "100%", transition: "all 0.15s" },
-  routeCardSelected: { border: `2px solid ${C.accent}`, background: C.accentLight },
-  routeCardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
-  routeName: { fontSize: 16, fontWeight: 700, marginBottom: 4 },
-  routeMeta: { fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 8 },
-  routeTag: { fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 600 },
-  tagScenic: { background: "#e8f5ea", color: C.scenic },
-  tagFast: { background: C.accentLight, color: C.accent },
-  routeDesc: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
-  ctaBtn: { width: "100%", background: C.accent, color: "#fff", fontWeight: 900, fontSize: 15, padding: "14px", borderRadius: 12, border: "none", cursor: "pointer", letterSpacing: 1, marginTop: 4, fontFamily: "inherit", boxShadow: `0 4px 14px ${C.accent}44` },
-  timerCard: { background: `linear-gradient(135deg,${C.accentLight} 0%,#fffaf9 100%)`, border: `2px solid ${C.accent}33`, borderRadius: 20, padding: "28px 20px", textAlign: "center", marginBottom: 20 },
-  timerTime: { fontSize: 64, fontWeight: 900, letterSpacing: -2, color: C.accent, lineHeight: 1 },
-  timerLabel: { fontSize: 11, letterSpacing: 4, color: C.muted, marginTop: 8, marginBottom: 20, textTransform: "uppercase" },
-  liveStatsRow: { display: "flex", justifyContent: "center", alignItems: "center", marginBottom: 20, background: "#fff", borderRadius: 12, padding: "12px 0", border: `1px solid ${C.border}` },
-  liveStat: { flex: 1, textAlign: "center" },
-  liveStatNum: { fontSize: 22, fontWeight: 900, color: C.accent },
-  liveStatLabel: { fontSize: 9, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginTop: 2 },
-  liveStatDivider: { width: 1, height: 32, background: C.border },
-  bigBtn: { width: 72, height: 72, borderRadius: "50%", background: C.accent, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", transition: "transform 0.1s", boxShadow: `0 0 24px ${C.accent}44` },
-  bigBtnStop: { background: C.accentDark, boxShadow: `0 0 24px ${C.accentDark}44` },
-  gpsNote: { fontSize: 11, color: C.muted, marginTop: 12 },
-  routeSummary: { display: "flex", gap: 20, fontSize: 13, color: C.muted, marginTop: 4 },
-  calCard: { background: `linear-gradient(135deg,${C.accentLight},#faf7f4)`, border: `1.5px solid ${C.accent}33`, borderRadius: 16, padding: 24, textAlign: "center" },
-  calNum: { fontSize: 56, fontWeight: 900, color: C.accent, letterSpacing: -2, lineHeight: 1 },
-  calLabel: { fontSize: 10, letterSpacing: 3, color: C.muted, marginTop: 4, textTransform: "uppercase" },
-  calSub: { fontSize: 11, color: C.muted, marginTop: 8 },
-  statGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 },
-  statBox: { background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: 16, textAlign: "center" },
-  statNum: { fontSize: 32, fontWeight: 900, color: C.accent, letterSpacing: -1 },
-  statLabel: { fontSize: 10, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginTop: 4 },
-  emptyState: { textAlign: "center", padding: "40px 20px", color: C.muted },
-  historyCard: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, marginBottom: 10 },
-  historyTop: { display: "flex", justifyContent: "space-between", marginBottom: 8 },
-  historyRoute: { fontWeight: 700, fontSize: 14 },
-  historyDate: { fontSize: 11, color: C.muted },
-  historyMeta: { display: "flex", gap: 14, fontSize: 12, color: C.muted, flexWrap: "wrap" },
-  gpsBadge: { background: C.accentLight, color: C.accent, fontSize: 10, padding: "1px 7px", borderRadius: 10, fontWeight: 600 },
-  infoCard: { background: C.accentLight, borderRadius: 12, padding: 16, marginBottom: 16, border: `1px solid ${C.accent}22` },
-  infoText: { fontSize: 13, color: C.muted, lineHeight: 1.7, margin: 0 },
+const darkTheme = {
+  bg: "#1a1a1a", surface: "#252525", surface2: "#2e2e2e",
+  accent: "#c41e1e", accentDark: "#9B0000", accentLight: "#3d2020",
+  scenic: "#5a9c6a", text: "#e8e4e0", muted: "#9a8f88",
+  border: "#3d3832", navBg: "#9B0000", headerBg: "#9B0000",
+  inputBg: "#2e2e2e", timerGrad: "linear-gradient(135deg,#3d2020 0%,#252525 100%)",
+  liveStatBg: "#252525", calGrad: "linear-gradient(135deg,#3d2020,#1a1a1a)",
+  pacHover: "#3d2020", pacMatch: "#e88",
 };
 
-const globalCSS = `
+function getStyles(C) {
+  return {
+    app: { minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'DM Mono','Courier New',monospace", display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", position: "relative" },
+    header: { padding: "24px 20px 12px", borderBottom: `3px solid ${C.accentDark}`, background: C.headerBg },
+    logo: { fontSize: 28, letterSpacing: "-1px", lineHeight: 1 },
+    logoMad: { color: "#fff", fontWeight: 900 },
+    logoDash: { color: "#ffd0d0", fontWeight: 300 },
+    headerSub: { fontSize: 10, color: "#ffd0d0", letterSpacing: 2, marginTop: 4, textTransform: "uppercase" },
+    headerRow: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 },
+    themeBtn: { background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "8px 10px", cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", gap: 6, fontSize: 12 },
+    main: { flex: 1, overflowY: "auto", paddingBottom: 80 },
+    tabContent: { padding: "20px 16px" },
+    tabTitle: { fontSize: 22, fontWeight: 700, margin: "0 0 20px", letterSpacing: "-0.5px" },
+    nav: { position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: C.navBg, borderTop: `2px solid ${C.accentDark}`, display: "flex", padding: "8px 0 12px" },
+    navBtn: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", color: "rgba(255,255,255,0.55)", cursor: "pointer", fontSize: 10, letterSpacing: 1, position: "relative", padding: "6px 0" },
+    navBtnActive: { color: "#fff" },
+    navLabel: { fontSize: 9, letterSpacing: 1, textTransform: "uppercase" },
+    navDot: { position: "absolute", bottom: 0, width: 4, height: 4, borderRadius: "50%", background: "#fff" },
+    card: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 16 },
+    cardLabel: { fontSize: 9, letterSpacing: 3, color: C.muted, textTransform: "uppercase", marginBottom: 12 },
+    input: { width: "100%", background: C.inputBg, border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, padding: "10px 12px", boxSizing: "border-box", fontFamily: "inherit", outline: "none", marginBottom: 10 },
+    inputIcon: { position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.muted, pointerEvents: "none", display: "flex", alignItems: "center" },
+    inputRow: { display: "flex", gap: 10 },
+    inputGroup: { flex: 1, display: "flex", flexDirection: "column" },
+    inputLabel: { fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6, textTransform: "uppercase" },
+    locationDivider: { display: "flex", alignItems: "center", gap: 8, margin: "4px 0 10px", color: C.muted },
+    routeLine: { flex: 1, height: 1, background: C.border },
+    arrowDown: { fontSize: 14 },
+    mapPlaceholder: { background: C.surface2, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", border: `1px dashed ${C.border}`, marginTop: 8 },
+    mapInner: { textAlign: "center" },
+    mapIcon: { fontSize: 32, display: "block" },
+    mapText: { fontSize: 13, color: C.text, marginTop: 8, display: "block" },
+    filterRow: { display: "flex", gap: 8, marginBottom: 12 },
+    filterBtn: { flex: 1, background: C.surface, border: `1.5px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "8px 0", fontSize: 11, cursor: "pointer", letterSpacing: 1 },
+    filterBtnActive: { background: C.accent, color: "#fff", borderColor: C.accent, fontWeight: 700 },
+    routeList: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 },
+    routeCard: { background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: 14, textAlign: "left", cursor: "pointer", color: C.text, width: "100%", transition: "all 0.15s" },
+    routeCardSelected: { border: `2px solid ${C.accent}`, background: C.accentLight },
+    routeCardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
+    routeName: { fontSize: 16, fontWeight: 700, marginBottom: 4 },
+    routeMeta: { fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 8 },
+    routeTag: { fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 600 },
+    tagScenic: { background: "#e8f5ea", color: C.scenic },
+    tagFast: { background: C.accentLight, color: C.accent },
+    routeDesc: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
+    ctaBtn: { width: "100%", background: C.accent, color: "#fff", fontWeight: 900, fontSize: 15, padding: "14px", borderRadius: 12, border: "none", cursor: "pointer", letterSpacing: 1, marginTop: 4, fontFamily: "inherit", boxShadow: `0 4px 14px ${C.accent}44` },
+    timerCard: { background: C.timerGrad, border: `2px solid ${C.accent}33`, borderRadius: 20, padding: "28px 20px", textAlign: "center", marginBottom: 20 },
+    timerTime: { fontSize: 64, fontWeight: 900, letterSpacing: -2, color: C.accent, lineHeight: 1 },
+    timerLabel: { fontSize: 11, letterSpacing: 4, color: C.muted, marginTop: 8, marginBottom: 20, textTransform: "uppercase" },
+    liveStatsRow: { display: "flex", justifyContent: "center", alignItems: "center", marginBottom: 20, background: C.liveStatBg, borderRadius: 12, padding: "12px 0", border: `1px solid ${C.border}` },
+    liveStat: { flex: 1, textAlign: "center" },
+    liveStatNum: { fontSize: 22, fontWeight: 900, color: C.accent },
+    liveStatLabel: { fontSize: 9, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginTop: 2 },
+    liveStatDivider: { width: 1, height: 32, background: C.border },
+    bigBtn: { width: 72, height: 72, borderRadius: "50%", background: C.accent, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", transition: "transform 0.1s", boxShadow: `0 0 24px ${C.accent}44` },
+    bigBtnStop: { background: C.accentDark, boxShadow: `0 0 24px ${C.accentDark}44` },
+    gpsNote: { fontSize: 11, color: C.muted, marginTop: 12 },
+    routeSummary: { display: "flex", gap: 20, fontSize: 13, color: C.muted, marginTop: 4 },
+    calCard: { background: C.calGrad, border: `1.5px solid ${C.accent}33`, borderRadius: 16, padding: 24, textAlign: "center" },
+    calNum: { fontSize: 56, fontWeight: 900, color: C.accent, letterSpacing: -2, lineHeight: 1 },
+    calLabel: { fontSize: 10, letterSpacing: 3, color: C.muted, marginTop: 4, textTransform: "uppercase" },
+    calSub: { fontSize: 11, color: C.muted, marginTop: 8 },
+    statGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 },
+    statBox: { background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: 16, textAlign: "center" },
+    statNum: { fontSize: 32, fontWeight: 900, color: C.accent, letterSpacing: -1 },
+    statLabel: { fontSize: 10, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginTop: 4 },
+    emptyState: { textAlign: "center", padding: "40px 20px", color: C.muted },
+    historyCard: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, marginBottom: 10 },
+    historyTop: { display: "flex", justifyContent: "space-between", marginBottom: 8 },
+    historyRoute: { fontWeight: 700, fontSize: 14 },
+    historyDate: { fontSize: 11, color: C.muted },
+    historyMeta: { display: "flex", gap: 14, fontSize: 12, color: C.muted, flexWrap: "wrap" },
+    gpsBadge: { background: C.accentLight, color: C.accent, fontSize: 10, padding: "1px 7px", borderRadius: 10, fontWeight: 600 },
+    infoCard: { background: C.accentLight, borderRadius: 12, padding: 16, marginBottom: 16, border: `1px solid ${C.accent}22` },
+    infoText: { fontSize: 13, color: C.muted, lineHeight: 1.7, margin: 0 },
+  };
+}
+
+const getGlobalCSS = (darkMode) => `
   * { box-sizing: border-box; }
   body { margin: 0; background: #faf7f4; }
-  input:focus { border-color: #9B0000 !important; outline: none; box-shadow: 0 0 0 3px rgba(155,0,0,0.10); }
+  input:focus { border-color: ${darkMode ? "#c41e1e" : "#9B0000"} !important; outline: none; box-shadow: 0 0 0 3px ${darkMode ? "rgba(196,30,30,0.25)" : "rgba(155,0,0,0.10)"}; }
   button:active { transform: scale(0.97); }
-  .pac-container { font-family: 'DM Mono',monospace; border-radius: 8px; border: 1.5px solid #ddd5cc; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin-top: 4px; }
-  .pac-item { padding: 8px 12px; font-size: 13px; color: #2e2620; cursor: pointer; }
-  .pac-item:hover, .pac-item-selected { background: #f5eaea; }
-  .pac-matched { color: #9B0000; font-weight: 700; }
+  .pac-container { font-family: 'DM Mono',monospace; border-radius: 8px; border: 1.5px solid ${darkMode ? "#3d3832" : "#ddd5cc"}; box-shadow: 0 4px 20px rgba(0,0,0,0.2); margin-top: 4px; background: ${darkMode ? "#252525" : "#fff"}; }
+  .pac-item { padding: 8px 12px; font-size: 13px; color: ${darkMode ? "#e8e4e0" : "#2e2620"}; cursor: pointer; }
+  .pac-item:hover, .pac-item-selected { background: ${darkMode ? "#3d2020" : "#f5eaea"}; }
+  .pac-matched { color: ${darkMode ? "#e88" : "#9B0000"}; font-weight: 700; }
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
 `;

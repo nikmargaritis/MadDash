@@ -86,8 +86,8 @@ useEffect(() => {
 | Run timer (start/stop) | ✅ Working |
 | Calorie estimator (MET-based) | ✅ Working |
 | Run history & stats | ✅ Working |
-| User profile (weight, age) | ✅ Working |
-| GPS tracking (like Strava) | 🔧 See below |
+| User profile (weight in lbs, age) | ✅ Working |
+| GPS live tracking | 🔧 See below |
 
 ---
 
@@ -130,8 +130,8 @@ Output goes to `/dist`. Deploy to Vercel, Netlify, or any static host.
 MadDash uses MET values (Metabolic Equivalent of Task):
 
 ```
-MET ≈ 90 / pace_in_min_per_km   (clamped 6–14)
-Calories = MET × weight_kg × duration_hours
+MET ≈ 90 / pace_in_min_per_mile   (clamped 6–14)
+Calories = MET × weight_lbs × 0.453592 × duration_hours
 ```
 
-Example: 70 kg runner, 5:30/km pace, 30 min = ~385 cal
+Example: 155 lb runner, 9:00/mi pace, 30 min ≈ 320 cal

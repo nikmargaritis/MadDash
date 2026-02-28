@@ -9,9 +9,14 @@ function useTheme() {
   return ctx;
 }
 
+
+// ─── UNIT CONVERSIONS ────────────────────────────────────────────────────────
+const lbsToKg = (lbs) => lbs * 0.453592;
+const miToKm  = (mi)  => mi  / 0.621371;
+
 // ─── HAVERSINE DISTANCE ──────────────────────────────────────────────────────
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
+function haversineMi(lat1, lon1, lat2, lon2) {
+  const R = 3958.8; // Earth radius in miles
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -23,7 +28,9 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 
 // ─── CALORIE CALC ────────────────────────────────────────────────────────────
-function calcCalories({ weightKg, durationMin, distanceKm }) {
+function calcCalories({ weightLbs, durationMin, distanceMi }) {
+  const weightKg = lbsToKg(weightLbs);
+  const distanceKm = miToKm(distanceMi);
   const paceMinPerKm = distanceKm > 0 ? durationMin / distanceKm : 6;
   const met = Math.max(6, Math.min(14, 90 / paceMinPerKm));
   return Math.round(met * weightKg * (durationMin / 60));
@@ -61,10 +68,10 @@ const Icons = {
 
 // ─── PRESET MADISON ROUTES ───────────────────────────────────────────────────
 const PRESET_ROUTES = [
-  { id: 1, name: "Lakeshore Path", type: "scenic", distanceKm: 5.2, elevationM: 20, description: "Beautiful run along Lake Mendota past Memorial Union.", start: "Memorial Union, Madison, WI", end: "Picnic Point, Madison, WI" },
-  { id: 2, name: "Capitol Loop", type: "fast", distanceKm: 3.8, elevationM: 15, description: "Fast flat loop around the Wisconsin State Capitol.", start: "Wisconsin State Capitol, Madison, WI", end: "Wisconsin State Capitol, Madison, WI" },
-  { id: 3, name: "Monona Terrace Loop", type: "scenic", distanceKm: 6.5, elevationM: 30, description: "Scenic route along Lake Monona with city views.", start: "Monona Terrace, Madison, WI", end: "Olbrich Park, Madison, WI" },
-  { id: 4, name: "UW Campus Sprint", type: "fast", distanceKm: 2.8, elevationM: 10, description: "Quick run through the UW Madison campus.", start: "Bascom Hall, Madison, WI", end: "Camp Randall Stadium, Madison, WI" },
+  { id: 1, name: "Lakeshore Path", type: "scenic", distanceMi: 3.2, elevationFt: 66, description: "Beautiful run along Lake Mendota past Memorial Union.", start: "Memorial Union, Madison, WI", end: "Picnic Point, Madison, WI" },
+  { id: 2, name: "Capitol Loop", type: "fast", distanceMi: 2.4, elevationFt: 49, description: "Fast flat loop around the Wisconsin State Capitol.", start: "Wisconsin State Capitol, Madison, WI", end: "Wisconsin State Capitol, Madison, WI" },
+  { id: 3, name: "Monona Terrace Loop", type: "scenic", distanceMi: 4.0, elevationFt: 98, description: "Scenic route along Lake Monona with city views.", start: "Monona Terrace, Madison, WI", end: "Olbrich Park, Madison, WI" },
+  { id: 4, name: "UW Campus Sprint", type: "fast", distanceMi: 1.7, elevationFt: 33, description: "Quick run through the UW Madison campus.", start: "Bascom Hall, Madison, WI", end: "Camp Randall Stadium, Madison, WI" },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -73,16 +80,16 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem("madDashDark")) === true; } catch { return false; }
   });
   const [tab, setTab] = useState("routes");
-  const [profile, setProfile] = useState({ name: "Runner", weight: 70, age: 28 });
+  const [profile, setProfile] = useState({ name: "Runner", weight: 155, age: 28 }); // weight in lbs
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [routeFilter, setRouteFilter] = useState("all");
   const [startLocation, setStartLocation] = useState("");
   const [endLocation, setEndLocation] = useState("");
-  const [pace, setPace] = useState("5.5");
+  const [pace, setPace] = useState("9.0"); // min/mile
   const [runActive, setRunActive] = useState(false);
   const [runElapsed, setRunElapsed] = useState(0);
   const [runHistory, setRunHistory] = useState([]);
-  const [liveDistanceKm, setLiveDistanceKm] = useState(0);
+  const [liveDistanceMi, setLiveDistanceMi] = useState(0);
   const [mapsReady, setMapsReady] = useState(false);
   const timerRef = useRef(null);
   const gpsWatchRef = useRef(null);
@@ -111,7 +118,7 @@ export default function App() {
 
   const startRun = () => {
     setRunElapsed(0);
-    setLiveDistanceKm(0);
+    setLiveDistanceMi(0);
     gpsPathRef.current = [];
     setRunActive(true);
     if (navigator.geolocation) {
@@ -121,8 +128,8 @@ export default function App() {
           const path = gpsPathRef.current;
           if (path.length > 0) {
             const last = path[path.length - 1];
-            const added = haversineKm(last.lat, last.lng, latitude, longitude);
-            setLiveDistanceKm(d => parseFloat((d + added).toFixed(3)));
+            const added = haversineMi(last.lat, last.lng, latitude, longitude);
+            setLiveDistanceMi(d => parseFloat((d + added).toFixed(3)));
           }
           gpsPathRef.current = [...path, { lat: latitude, lng: longitude }];
         },
@@ -139,18 +146,18 @@ export default function App() {
       gpsWatchRef.current = null;
     }
     const durationMin = runElapsed / 60;
-    const distanceKm = liveDistanceKm > 0.05
-      ? liveDistanceKm
-      : selectedRoute ? selectedRoute.distanceKm : durationMin / parseFloat(pace || 5.5);
-    const cals = calcCalories({ weightKg: profile.weight, durationMin, distanceKm });
+    const distanceMi = liveDistanceMi > 0.05
+      ? liveDistanceMi
+      : selectedRoute ? selectedRoute.distanceMi : durationMin / parseFloat(pace || 9.0);
+    const cals = calcCalories({ weightLbs: profile.weight, durationMin, distanceMi });
     setRunHistory(h => [{
       id: Date.now(),
       date: new Date().toLocaleDateString(),
       route: selectedRoute ? selectedRoute.name : "Custom Run",
       durationMin: Math.round(durationMin),
-      distanceKm: parseFloat(distanceKm.toFixed(2)),
+      distanceMi: parseFloat(distanceMi.toFixed(2)),
       calories: cals,
-      gpsTracked: liveDistanceKm > 0.05,
+      gpsTracked: liveDistanceMi > 0.05,
     }, ...h]);
     setTab("stats");
   };
@@ -164,14 +171,14 @@ export default function App() {
       : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
-  const livePace = runActive && liveDistanceKm > 0.05 && runElapsed > 0
-    ? ((runElapsed / 60) / liveDistanceKm).toFixed(1)
+  const livePace = runActive && liveDistanceMi > 0.05 && runElapsed > 0
+    ? ((runElapsed / 60) / liveDistanceMi).toFixed(1)
     : pace;
 
   const previewCals = calcCalories({
-    weightKg: profile.weight,
-    durationMin: selectedRoute ? selectedRoute.distanceKm * parseFloat(pace || 5.5) : 30,
-    distanceKm: selectedRoute ? selectedRoute.distanceKm : 30 / parseFloat(pace || 5.5),
+    weightLbs: profile.weight,
+    durationMin: selectedRoute ? selectedRoute.distanceMi * parseFloat(pace || 9.0) : 30,
+    distanceMi: selectedRoute ? selectedRoute.distanceMi : 30 / parseFloat(pace || 9.0),
   });
 
   const filtered = routeFilter === "all" ? PRESET_ROUTES : PRESET_ROUTES.filter(r => r.type === routeFilter);
@@ -213,7 +220,7 @@ export default function App() {
             selectedRoute={selectedRoute} pace={pace} setPace={setPace}
             profile={profile} previewCals={previewCals}
             runActive={runActive} runElapsed={runElapsed}
-            liveDistanceKm={liveDistanceKm} livePace={livePace}
+            liveDistanceMi={liveDistanceMi} livePace={livePace}
             startRun={startRun} stopRun={stopRun} fmtTime={fmtTime}
             mapsReady={mapsReady} startLocation={startLocation} endLocation={endLocation}
           />
@@ -354,7 +361,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
               <div>
                 <div style={styles.routeName}>{route.name}</div>
                 <div style={styles.routeMeta}>
-                  {route.distanceKm} km &nbsp;·&nbsp; ↑{route.elevationM}m
+                  {route.distanceMi} mi &nbsp;·&nbsp; ↑{route.elevationFt} ft
                   <span style={{ ...styles.routeTag, ...(route.type === "scenic" ? styles.tagScenic : styles.tagFast) }}>
                     {route.type === "scenic" ? "🌿 Scenic" : "⚡ Fast"}
                   </span>
@@ -374,9 +381,9 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
 }
 
 // ─── RUN TAB ──────────────────────────────────────────────────────────────────
-function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runElapsed, liveDistanceKm, livePace, startRun, stopRun, fmtTime, mapsReady, startLocation, endLocation }) {
+function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runElapsed, liveDistanceMi, livePace, startRun, stopRun, fmtTime, mapsReady, startLocation, endLocation }) {
   const { styles } = useTheme();
-  const liveCals = calcCalories({ weightKg: profile.weight, durationMin: runElapsed / 60, distanceKm: Math.max(liveDistanceKm, 0.01) });
+  const liveCals = calcCalories({ weightLbs: profile.weight, durationMin: runElapsed / 60, distanceMi: Math.max(liveDistanceMi, 0.01) });
 
   return (
     <div style={styles.tabContent}>
@@ -391,9 +398,9 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
         <div style={styles.timerLabel}>{runActive ? "● RUNNING" : "READY TO RUN"}</div>
         {runActive && (
           <div style={styles.liveStatsRow}>
-            <div style={styles.liveStat}><div style={styles.liveStatNum}>{liveDistanceKm.toFixed(2)}</div><div style={styles.liveStatLabel}>km</div></div>
+            <div style={styles.liveStat}><div style={styles.liveStatNum}>{liveDistanceMi.toFixed(2)}</div><div style={styles.liveStatLabel}>miles</div></div>
             <div style={styles.liveStatDivider} />
-            <div style={styles.liveStat}><div style={styles.liveStatNum}>{livePace}</div><div style={styles.liveStatLabel}>min/km</div></div>
+            <div style={styles.liveStat}><div style={styles.liveStatNum}>{livePace}</div><div style={styles.liveStatLabel}>min/mi</div></div>
             <div style={styles.liveStatDivider} />
             <div style={styles.liveStat}><div style={styles.liveStatNum}>{liveCals}</div><div style={styles.liveStatLabel}>cal</div></div>
           </div>
@@ -408,18 +415,18 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
           <div style={styles.cardLabel}>⚙️ Run Settings</div>
           <div style={styles.inputRow}>
             <div style={styles.inputGroup}>
-              <label style={styles.inputLabel}>Pace (min/km)</label>
-              <input style={styles.input} type="number" min="2" max="20" step="0.1" value={pace} onChange={e => setPace(e.target.value)} />
+              <label style={styles.inputLabel}>Pace (min/mi)</label>
+              <input style={styles.input} type="number" min="4" max="30" step="0.1" value={pace} onChange={e => setPace(e.target.value)} />
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.inputLabel}>Weight (kg)</label>
+              <label style={styles.inputLabel}>Weight (lbs)</label>
               <input style={{ ...styles.input, opacity: 0.6 }} value={profile.weight} readOnly />
             </div>
           </div>
           {selectedRoute && (
             <div style={styles.routeSummary}>
-              <span>📏 {selectedRoute.distanceKm} km</span>
-              <span>⏱ ~{Math.round(selectedRoute.distanceKm * parseFloat(pace || 5.5))} min</span>
+              <span>📏 {selectedRoute.distanceMi} mi</span>
+              <span>⏱ ~{Math.round(selectedRoute.distanceMi * parseFloat(pace || 9.0))} min</span>
             </div>
           )}
         </div>
@@ -428,7 +435,7 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
         <div style={styles.calCard}>
           <div style={styles.calNum}>{previewCals}</div>
           <div style={styles.calLabel}>Estimated Calories</div>
-          <div style={styles.calSub}>Based on {profile.weight} kg · {pace} min/km</div>
+          <div style={styles.calSub}>Based on {profile.weight} lbs · {pace} min/mi</div>
         </div>
       )}
     </div>
@@ -439,13 +446,13 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
 function StatsTab({ history }) {
   const { styles } = useTheme();
   const totalCals = history.reduce((a, r) => a + r.calories, 0);
-  const totalKm = history.reduce((a, r) => a + r.distanceKm, 0);
+  const totalMi = history.reduce((a, r) => a + r.distanceMi, 0);
   const totalMins = history.reduce((a, r) => a + r.durationMin, 0);
   return (
     <div style={styles.tabContent}>
       <h2 style={styles.tabTitle}>Your Stats</h2>
       <div style={styles.statGrid}>
-        <div style={styles.statBox}><div style={styles.statNum}>{totalKm.toFixed(1)}</div><div style={styles.statLabel}>Total km</div></div>
+        <div style={styles.statBox}><div style={styles.statNum}>{totalMi.toFixed(1)}</div><div style={styles.statLabel}>Total mi</div></div>
         <div style={styles.statBox}><div style={styles.statNum}>{totalCals}</div><div style={styles.statLabel}>Calories</div></div>
         <div style={styles.statBox}><div style={styles.statNum}>{history.length}</div><div style={styles.statLabel}>Runs</div></div>
         <div style={styles.statBox}><div style={styles.statNum}>{totalMins}</div><div style={styles.statLabel}>Minutes</div></div>
@@ -462,7 +469,7 @@ function StatsTab({ history }) {
                 <span style={styles.historyDate}>{run.date}</span>
               </div>
               <div style={styles.historyMeta}>
-                <span>📏 {run.distanceKm} km</span>
+                <span>📏 {run.distanceMi} mi</span>
                 <span>⏱ {run.durationMin} min</span>
                 <span>🔥 {run.calories} cal</span>
                 {run.gpsTracked && <span style={styles.gpsBadge}>📡 GPS</span>}
@@ -494,8 +501,8 @@ function ProfileTab({ profile, setProfile }) {
             <input style={styles.input} type="number" min="10" max="100" value={profile.age} onChange={e => set("age", parseInt(e.target.value))} />
           </div>
           <div style={styles.inputGroup}>
-            <label style={styles.inputLabel}>Weight (kg)</label>
-            <input style={styles.input} type="number" min="30" max="250" value={profile.weight} onChange={e => set("weight", parseFloat(e.target.value))} />
+            <label style={styles.inputLabel}>Weight (lbs)</label>
+            <input style={styles.input} type="number" min="66" max="550" value={profile.weight} onChange={e => set("weight", parseFloat(e.target.value))} />
           </div>
         </div>
       </div>
@@ -511,8 +518,8 @@ function ProfileTab({ profile, setProfile }) {
         <div style={styles.cardLabel}>🧮 Calorie Formula</div>
         <p style={styles.infoText}>
           Uses MET (Metabolic Equivalent of Task) based on pace.<br />
-          <strong>Calories = MET × weight(kg) × hours</strong><br />
-          MET ranges 6–14 based on min/km. GPS distance is used when available.
+          <strong>Calories = MET × weight(lbs) × hours</strong><br />
+          MET ranges 6–14 based on min/mi. GPS distance is used when available.
         </p>
       </div>
     </div>

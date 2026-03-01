@@ -563,6 +563,30 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
     ? pointAtDistanceMi(currentLocation.lat, currentLocation.lng, parseFloat(customDistanceMi) || 3, customDirection)
     : endLocation;
 
+  const [routedDistanceMi, setRoutedDistanceMi] = useState(null);
+
+  // Fetch real walking distance for user-typed start+end (not preset, not out-and-back)
+  useEffect(() => {
+    if (selected || bothCurrent || !mapsReady || !startLocation || !endLocation) {
+      setRoutedDistanceMi(null);
+      return;
+    }
+    const maps = window.google?.maps;
+    if (!maps) return;
+    const svc = new maps.DirectionsService();
+    svc.route(
+      { origin: startLocation, destination: endLocation, travelMode: maps.TravelMode.WALKING },
+      (result, status) => {
+        if (status === "OK") {
+          const meters = result.routes[0].legs.reduce((sum, leg) => sum + (leg.distance?.value ?? 0), 0);
+          setRoutedDistanceMi(parseFloat((meters / 1609.34).toFixed(2)));
+        } else {
+          setRoutedDistanceMi(null);
+        }
+      }
+    );
+  }, [mapsReady, selected, bothCurrent, startLocation, endLocation]);
+
   return (
     <div style={styles.tabContent}>
       <h2 style={styles.tabTitle}>Choose Your Route</h2>
@@ -640,6 +664,12 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
               <div style={styles.loopLegendRow}><strong>B</strong> — Midpoint (turnaround)</div>
               <div style={styles.loopLegendRow}><strong>C</strong> — Start &amp; finish (same as A)</div>
             </div>
+          </div>
+        )}
+        {(selected || bothCurrent || routedDistanceMi) && (
+          <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: -0.5, color: "#9B0000", margin: "12px 0 4px", textAlign: "center" }}>
+            {selected ? selected.distanceMi : bothCurrent ? (parseFloat(customDistanceMi) || 3) : routedDistanceMi}
+            <span style={{ fontSize: 13, fontWeight: 400, opacity: 0.7, letterSpacing: 1, marginLeft: 4 }}>mi</span>
           </div>
         )}
         <LiveMap startLocation={originForMap} endLocation={destForMap} mapsReady={mapsReady} currentLocation={currentLocation} outAndBack={bothCurrent} loopTargetMi={customDistanceMi} loopDirection={customDirection} waypoints={!bothCurrent && selected?.waypoints ? selected.waypoints : null} />
@@ -914,6 +944,15 @@ function getStyles(C) {
     tagFast: { background: C.accentLight, color: C.accent },
     routeDesc: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
     ctaBtn: { width: "100%", background: C.accent, color: "#fff", fontWeight: 900, fontSize: 15, padding: "14px", borderRadius: 12, border: "none", cursor: "pointer", letterSpacing: 1, marginTop: 4, fontFamily: "inherit", boxShadow: `0 4px 14px ${C.accent}44` },
+    distanceBanner: { display: "flex", alignItems: "stretch", background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 16 },
+    distanceBannerMain: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 16px", borderRight: `1px solid ${C.border}` },
+    distanceBannerMi: { fontSize: 52, fontWeight: 900, letterSpacing: -2, color: C.accent, lineHeight: 1 },
+    distanceBannerUnit: { fontSize: 11, letterSpacing: 3, color: C.muted, textTransform: "uppercase", marginTop: 4 },
+    distanceBannerSide: { display: "flex", flexDirection: "column", justifyContent: "center", gap: 0 },
+    distanceBannerStat: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "12px 20px" },
+    distanceBannerStatNum: { fontSize: 20, fontWeight: 900, color: C.text, letterSpacing: -0.5 },
+    distanceBannerStatLabel: { fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginTop: 2 },
+    distanceBannerDivider: { height: 1, background: C.border, margin: "0 12px" },
     timerCard: { background: C.timerGrad, border: `2px solid ${C.accent}33`, borderRadius: 20, padding: "28px 20px", textAlign: "center", marginBottom: 20 },
     timerTime: { fontSize: 64, fontWeight: 900, letterSpacing: -2, color: C.accent, lineHeight: 1 },
     timerLabel: { fontSize: 11, letterSpacing: 4, color: C.muted, marginTop: 8, marginBottom: 20, textTransform: "uppercase" },

@@ -46,6 +46,16 @@ function haversineMi(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+
+// ─── NEARBY CHECK ─────────────────────────────────────────────────────────────
+// Returns true if both locations are coord objects and within 0.5 miles of each other
+// (i.e., suitable for personalized out-and-back routing)
+function areNearby(a, b) {
+  if (typeof a !== "object" || a?.lat == null) return false;
+  if (typeof b !== "object" || b?.lat == null) return false;
+  return haversineMi(a.lat, a.lng, b.lat, b.lng) < 0.5;
+}
+
 // ─── CALORIE CALC ────────────────────────────────────────────────────────────
 function calcCalories({ weightLbs, durationMin, distanceMi }) {
   const weightKg = lbsToKg(weightLbs);
@@ -87,10 +97,18 @@ const Icons = {
 
 // ─── PRESET MADISON ROUTES ───────────────────────────────────────────────────
 const PRESET_ROUTES = [
-  { id: 1, name: "Lakeshore Path", type: "scenic", distanceMi: 3.2, elevationFt: 66, description: "Beautiful run along Lake Mendota past Memorial Union.", start: "Memorial Union, Madison, WI", end: "Picnic Point, Madison, WI" },
-  { id: 2, name: "Capitol Loop", type: "fast", distanceMi: 2.4, elevationFt: 49, description: "Fast flat loop around the Wisconsin State Capitol.", start: "Wisconsin State Capitol, Madison, WI", end: "Wisconsin State Capitol, Madison, WI" },
-  { id: 3, name: "Monona Terrace Loop", type: "scenic", distanceMi: 4.0, elevationFt: 98, description: "Scenic route along Lake Monona with city views.", start: "Monona Terrace, Madison, WI", end: "Olbrich Park, Madison, WI" },
-  { id: 4, name: "UW Campus Sprint", type: "fast", distanceMi: 1.7, elevationFt: 33, description: "Quick run through the UW Madison campus.", start: "Bascom Hall, Madison, WI", end: "Camp Randall Stadium, Madison, WI" },
+  { id: 1, name: "Lakeshore Path", type: "scenic", distanceMi: 3.2, elevationFt: 66, description: "Beautiful run along Lake Mendota past Memorial Union.",
+    start: { lat: 43.0766, lng: -89.4016, label: "Memorial Union, Madison, WI" },
+    end:   { lat: 43.0882, lng: -89.4251, label: "Picnic Point, Madison, WI" } },
+  { id: 2, name: "Capitol Loop", type: "fast", distanceMi: 2.4, elevationFt: 49, description: "Fast flat loop around the Wisconsin State Capitol.",
+    start: { lat: 43.0748, lng: -89.3838, label: "Wisconsin State Capitol, Madison, WI" },
+    end:   { lat: 43.0748, lng: -89.3838, label: "Wisconsin State Capitol, Madison, WI" } },
+  { id: 3, name: "Monona Terrace Loop", type: "scenic", distanceMi: 4.0, elevationFt: 98, description: "Scenic route along Lake Monona with city views.",
+    start: { lat: 43.0713, lng: -89.3803, label: "Monona Terrace, Madison, WI" },
+    end:   { lat: 43.0753, lng: -89.3334, label: "Olbrich Park, Madison, WI" } },
+  { id: 4, name: "UW Campus Sprint", type: "fast", distanceMi: 1.7, elevationFt: 33, description: "Quick run through the UW Madison campus.",
+    start: { lat: 43.0757, lng: -89.4056, label: "Bascom Hall, Madison, WI" },
+    end:   { lat: 43.0696, lng: -89.4124, label: "Camp Randall Stadium, Madison, WI" } },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -187,7 +205,7 @@ export default function App() {
       ? liveDistanceMi
       : selectedRoute ? selectedRoute.distanceMi : bothCurrent ? customDist : durationMin / parseFloat(pace || 9.0);
     const cals = calcCalories({ weightLbs: profile.weight, durationMin, distanceMi });
-    const routeName = selectedRoute ? selectedRoute.name : bothCurrent ? `Personalized Run (${customDist} mi)` : "Custom Run";
+    const routeName = selectedRoute ? selectedRoute.name : bothCurrent ? `Personalized Run (${customDist} mi)` : typeof startLocation === "object" && startLocation?.label ? startLocation.label.split(",")[0] + " → " + (typeof endLocation === "object" && endLocation?.label ? endLocation.label.split(",")[0] : "End") : "Custom Run";
     setRunHistory(h => [{
       id: Date.now(),
       date: new Date().toLocaleDateString(),
@@ -213,7 +231,7 @@ export default function App() {
     ? ((runElapsed / 60) / liveDistanceMi).toFixed(1)
     : pace;
 
-  const bothCurrentForPreview = typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null;
+  const bothCurrentForPreview = areNearby(startLocation, endLocation);
   const effectiveDistForPreview = selectedRoute ? selectedRoute.distanceMi : bothCurrentForPreview ? (parseFloat(customDistanceMi) || 3) : 30 / parseFloat(pace || 9.0);
   const previewCals = calcCalories({
     weightLbs: profile.weight,
@@ -225,8 +243,10 @@ export default function App() {
 
   const selectPreset = (route) => {
     setSelectedRoute(route);
-    setStartLocation(route.start);
+    setStartLocation(route.start);  // already {lat, lng, label}
     setEndLocation(route.end);
+    // Pre-fill the loop distance with this route's known distance
+    setCustomDistanceMi(String(route.distanceMi));
   };
 
   return (
@@ -502,6 +522,13 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
   const inputRef = useRef(null);
   const acRef = useRef(null);
 
+  // Derive display string from value (string or {lat,lng,label} object)
+  const displayValue = typeof value === "object" && value?.label
+    ? value.label
+    : typeof value === "object" && value?.lat != null
+    ? "Current position"
+    : (value || "");
+
   useEffect(() => {
     if (!mapsReady || !inputRef.current || acRef.current) return;
     const maps = window.google.maps;
@@ -511,7 +538,14 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
     });
     acRef.current.addListener("place_changed", () => {
       const place = acRef.current.getPlace();
-      if (place.formatted_address) onChange(place.formatted_address);
+      if (place.geometry?.location && place.formatted_address) {
+        // Return a rich object with lat/lng AND the address label
+        onChange({
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+          label: place.formatted_address,
+        });
+      }
     });
   }, [mapsReady]);
 
@@ -522,7 +556,7 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
         ref={inputRef}
         style={{ ...styles.input, paddingLeft: 34, marginBottom: 0 }}
         placeholder={placeholder}
-        value={value}
+        value={displayValue}
         onChange={e => onChange(e.target.value)}
       />
     </div>
@@ -532,10 +566,11 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
 // ─── ROUTES TAB ───────────────────────────────────────────────────────────────
 function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocation, setStartLocation, endLocation, setEndLocation, mapsReady, onGoToRun, currentLocation, customDistanceMi, setCustomDistanceMi, customDirection, setCustomDirection }) {
   const { styles } = useTheme();
-  const bothCurrent = typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null && endLocation?.lat != null;
+  const bothCurrent = areNearby(startLocation, endLocation);
   const originForMap = startLocation;
-  const destForMap = bothCurrent && currentLocation
-    ? pointAtDistanceMi(currentLocation.lat, currentLocation.lng, parseFloat(customDistanceMi) || 3, customDirection)
+  const anchorLoc = bothCurrent ? startLocation : null;
+  const destForMap = bothCurrent && anchorLoc
+    ? pointAtDistanceMi(anchorLoc.lat, anchorLoc.lng, parseFloat(customDistanceMi) || 3, customDirection)
     : endLocation;
 
   return (
@@ -657,10 +692,11 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
 function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runElapsed, liveDistanceMi, livePace, startRun, stopRun, fmtTime, mapsReady, startLocation, endLocation, currentLocation, customDistanceMi, customDirection }) {
   const { styles } = useTheme();
   const liveCals = calcCalories({ weightLbs: profile.weight, durationMin: runElapsed / 60, distanceMi: Math.max(liveDistanceMi, 0.01) });
-  const bothCurrent = typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null && endLocation?.lat != null;
+  const bothCurrent = areNearby(startLocation, endLocation);
   const runOrigin = startLocation || selectedRoute?.start;
-  const runDest = bothCurrent && currentLocation
-    ? pointAtDistanceMi(currentLocation.lat, currentLocation.lng, parseFloat(customDistanceMi) || 3, customDirection)
+  const anchorLoc = bothCurrent ? startLocation : null;
+  const runDest = bothCurrent && anchorLoc
+    ? pointAtDistanceMi(anchorLoc.lat, anchorLoc.lng, parseFloat(customDistanceMi) || 3, customDirection)
     : (endLocation || selectedRoute?.end);
   const effectiveDistance = selectedRoute ? selectedRoute.distanceMi : (bothCurrent ? parseFloat(customDistanceMi) || 3 : null);
 

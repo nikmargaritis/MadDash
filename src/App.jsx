@@ -9,13 +9,11 @@ function useTheme() {
   return ctx;
 }
 
-
 // ─── UNIT CONVERSIONS ────────────────────────────────────────────────────────
 const lbsToKg = (lbs) => lbs * 0.453592;
 const miToKm  = (mi)  => mi  / 0.621371;
 
 // ─── COORDINATE HELPERS ───────────────────────────────────────────────────────
-/** Point at exactly oneWayMiles in direction (for path-based loop search). */
 function pointInDirection(lat, lng, oneWayMiles, direction) {
   const milesPerDegLat = 69;
   const milesPerDegLng = 69 * Math.cos((lat * Math.PI) / 180);
@@ -35,7 +33,7 @@ function pointAtDistanceMi(lat, lng, distanceMi, direction) {
 
 // ─── HAVERSINE DISTANCE ──────────────────────────────────────────────────────
 function haversineMi(lat1, lon1, lat2, lon2) {
-  const R = 3958.8; // Earth radius in miles
+  const R = 3958.8;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -44,6 +42,13 @@ function haversineMi(lat1, lon1, lat2, lon2) {
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ─── NEARBY CHECK ─────────────────────────────────────────────────────────────
+function areNearby(a, b) {
+  if (typeof a !== "object" || a?.lat == null) return false;
+  if (typeof b !== "object" || b?.lat == null) return false;
+  return haversineMi(a.lat, a.lng, b.lat, b.lng) < 0.5;
 }
 
 // ─── CALORIE CALC ────────────────────────────────────────────────────────────
@@ -80,6 +85,7 @@ const Icons = {
   ChevronRight: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><polyline points="9,18 15,12 9,6"/></svg>),
   Play: () => (<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="5,3 19,12 5,21"/></svg>),
   Stop: () => (<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>),
+  Pause: () => (<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>),
   Location: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 00-8 8c0 5.25 8 13 8 13s8-7.75 8-13a8 8 0 00-8-8z"/></svg>),
   Moon: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>),
   Sun: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>),
@@ -87,10 +93,18 @@ const Icons = {
 
 // ─── PRESET MADISON ROUTES ───────────────────────────────────────────────────
 const PRESET_ROUTES = [
-  { id: 1, name: "Lakeshore Path", type: "scenic", distanceMi: 3.2, elevationFt: 66, description: "Beautiful run along Lake Mendota past Memorial Union.", start: "Memorial Union, Madison, WI", end: "Picnic Point, Madison, WI" },
-  { id: 2, name: "Capitol Loop", type: "fast", distanceMi: 2.4, elevationFt: 49, description: "Fast flat loop around the Wisconsin State Capitol.", start: "Wisconsin State Capitol, Madison, WI", end: "Wisconsin State Capitol, Madison, WI" },
-  { id: 3, name: "Monona Terrace Loop", type: "scenic", distanceMi: 4.0, elevationFt: 98, description: "Scenic route along Lake Monona with city views.", start: "Monona Terrace, Madison, WI", end: "Olbrich Park, Madison, WI" },
-  { id: 4, name: "UW Campus Sprint", type: "fast", distanceMi: 1.7, elevationFt: 33, description: "Quick run through the UW Madison campus.", start: "Bascom Hall, Madison, WI", end: "Camp Randall Stadium, Madison, WI" },
+  { id: 1, name: "Lakeshore Path", type: "scenic", distanceMi: 3.2, elevationFt: 66, description: "Beautiful run along Lake Mendota past Memorial Union.",
+    start: { lat: 43.0766, lng: -89.4016, label: "Memorial Union, Madison, WI" },
+    end:   { lat: 43.0882, lng: -89.4251, label: "Picnic Point, Madison, WI" } },
+  { id: 2, name: "Capitol Loop", type: "fast", distanceMi: 2.4, elevationFt: 49, description: "Fast flat loop around the Wisconsin State Capitol.",
+    start: { lat: 43.0748, lng: -89.3838, label: "Wisconsin State Capitol, Madison, WI" },
+    end:   { lat: 43.0748, lng: -89.3838, label: "Wisconsin State Capitol, Madison, WI" } },
+  { id: 3, name: "Monona Terrace Loop", type: "scenic", distanceMi: 4.0, elevationFt: 98, description: "Scenic loop around Lake Monona starting at Monona Terrace.",
+    start: { lat: 43.0713, lng: -89.3803, label: "Monona Terrace, Madison, WI" },
+    end:   { lat: 43.0713, lng: -89.3803, label: "Monona Terrace, Madison, WI" } },
+  { id: 4, name: "UW Campus Sprint", type: "fast", distanceMi: 1.7, elevationFt: 33, description: "Quick run through the UW Madison campus.",
+    start: { lat: 43.0757, lng: -89.4056, label: "Bascom Hall, Madison, WI" },
+    end:   { lat: 43.0696, lng: -89.4124, label: "Camp Randall Stadium, Madison, WI" } },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -99,16 +113,17 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem("madDashDark")) === true; } catch { return false; }
   });
   const [tab, setTab] = useState("routes");
-  const [profile, setProfile] = useState({ name: "Runner", weight: 155, age: 28 }); // weight in lbs
+  const [profile, setProfile] = useState({ name: "Runner", weight: 155, age: 28 });
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [routeFilter, setRouteFilter] = useState("all");
   const [startLocation, setStartLocation] = useState("");
   const [endLocation, setEndLocation] = useState("");
   const [customDistanceMi, setCustomDistanceMi] = useState("3");
   const [customDirection, setCustomDirection] = useState("N");
-  const [pace, setPace] = useState("9.0"); // min/mile
+  const [pace, setPace] = useState("0.0");
   const [runActive, setRunActive] = useState(false);
-  const [runElapsed, setRunElapsed] = useState(0);
+  const [runPaused, setRunPaused] = useState(false);
+  const [runElapsedMs, setRunElapsedMs] = useState(0);
   const [runHistory, setRunHistory] = useState([]);
   const [liveDistanceMi, setLiveDistanceMi] = useState(0);
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -132,27 +147,59 @@ export default function App() {
 
   useEffect(() => {
     if (!navigator.geolocation) return;
-    const handlePosition = (pos) => {
-      setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    };
-    navigator.geolocation.getCurrentPosition(handlePosition, () => {}, { enableHighAccuracy: true });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {}, { enableHighAccuracy: true }
+    );
   }, []);
 
   useEffect(() => {
-    if (runActive) {
-      timerRef.current = setInterval(() => setRunElapsed(s => s + 1), 1000);
+    if (runActive && !runPaused) {
+      timerRef.current = setInterval(() => setRunElapsedMs(ms => ms + 10), 10);
     } else {
       clearInterval(timerRef.current);
     }
     return () => clearInterval(timerRef.current);
-  }, [runActive]);
+  }, [runActive, runPaused]);
 
   const startRun = () => {
-    setRunElapsed(0);
+    setRunElapsedMs(0);
     setLiveDistanceMi(0);
     liveDistanceRef.current = 0;
     gpsPathRef.current = [];
+    setRunPaused(false);
     setRunActive(true);
+    if (navigator.geolocation) {
+      gpsWatchRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setCurrentLocation({ lat: latitude, lng: longitude });
+          const path = gpsPathRef.current;
+          if (path.length > 0) {
+            const last = path[path.length - 1];
+            const added = haversineMi(last.lat, last.lng, latitude, longitude);
+            const newTotal = parseFloat((liveDistanceRef.current + added).toFixed(3));
+            liveDistanceRef.current = newTotal;
+            setLiveDistanceMi(newTotal);
+          }
+          gpsPathRef.current = [...path, { lat: latitude, lng: longitude }];
+        },
+        (err) => console.warn("GPS error:", err),
+        { enableHighAccuracy: true, maximumAge: 0 }
+      );
+    }
+  };
+
+  const pauseRun = () => {
+    setRunPaused(true);
+    if (gpsWatchRef.current) {
+      navigator.geolocation.clearWatch(gpsWatchRef.current);
+      gpsWatchRef.current = null;
+    }
+  };
+
+  const resumeRun = () => {
+    setRunPaused(false);
     if (navigator.geolocation) {
       gpsWatchRef.current = navigator.geolocation.watchPosition(
         (pos) => {
@@ -176,18 +223,25 @@ export default function App() {
 
   const stopRun = () => {
     setRunActive(false);
+    setRunPaused(false);
     if (gpsWatchRef.current) {
       navigator.geolocation.clearWatch(gpsWatchRef.current);
       gpsWatchRef.current = null;
     }
-    const durationMin = runElapsed / 60;
-    const bothCurrent = !selectedRoute && typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null;
+    const durationMin = runElapsedMs / 60000;
+    const bothCurrent = !selectedRoute && areNearby(startLocation, endLocation);
     const customDist = parseFloat(customDistanceMi) || 3;
     const distanceMi = liveDistanceMi > 0.05
       ? liveDistanceMi
       : selectedRoute ? selectedRoute.distanceMi : bothCurrent ? customDist : durationMin / parseFloat(pace || 9.0);
     const cals = calcCalories({ weightLbs: profile.weight, durationMin, distanceMi });
-    const routeName = selectedRoute ? selectedRoute.name : bothCurrent ? `Personalized Run (${customDist} mi)` : "Custom Run";
+    const routeName = selectedRoute
+      ? selectedRoute.name
+      : bothCurrent
+      ? `Personalized Run (${customDist} mi)`
+      : typeof startLocation === "object" && startLocation?.label
+      ? startLocation.label.split(",")[0] + " → " + (typeof endLocation === "object" && endLocation?.label ? endLocation.label.split(",")[0] : "End")
+      : "Custom Run";
     setRunHistory(h => [{
       id: Date.now(),
       date: new Date().toLocaleDateString(),
@@ -200,20 +254,23 @@ export default function App() {
     setTab("stats");
   };
 
-  const fmtTime = (s) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
+  const fmtTime = (ms) => {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const sec = totalSec % 60;
+    const millis = Math.floor((ms % 1000) / 10);
+    const msPart = `.${String(millis).padStart(2, "0")}`;
     return h > 0
-      ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-      : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+      ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}${msPart}`
+      : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}${msPart}`;
   };
 
-  const livePace = runActive && liveDistanceMi > 0.05 && runElapsed > 0
-    ? ((runElapsed / 60) / liveDistanceMi).toFixed(1)
+  const livePace = runActive && !runPaused && liveDistanceMi > 0.05 && runElapsedMs > 0
+    ? ((runElapsedMs / 60000) / liveDistanceMi).toFixed(1)
     : pace;
 
-  const bothCurrentForPreview = typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null;
+  const bothCurrentForPreview = !selectedRoute && areNearby(startLocation, endLocation);
   const effectiveDistForPreview = selectedRoute ? selectedRoute.distanceMi : bothCurrentForPreview ? (parseFloat(customDistanceMi) || 3) : 30 / parseFloat(pace || 9.0);
   const previewCals = calcCalories({
     weightLbs: profile.weight,
@@ -227,7 +284,11 @@ export default function App() {
     setSelectedRoute(route);
     setStartLocation(route.start);
     setEndLocation(route.end);
+    setCustomDistanceMi(String(route.distanceMi));
   };
+
+  const handleStartChange = (v) => { setStartLocation(v); setSelectedRoute(null); };
+  const handleEndChange   = (v) => { setEndLocation(v);   setSelectedRoute(null); };
 
   return (
     <ThemeContext.Provider value={themeValue}>
@@ -239,7 +300,7 @@ export default function App() {
             <div style={styles.logo}><span style={styles.logoMad}>MAD</span><span style={styles.logoDash}>DASH</span></div>
             <div style={styles.headerSub}>Health &amp; Lifestyle Tracker · UW Madison</div>
           </div>
-          <button type="button" style={styles.themeBtn} onClick={() => setDarkMode(d => !d)} title={darkMode ? "Switch to light mode" : "Switch to dark mode"}>
+          <button type="button" style={styles.themeBtn} onClick={() => setDarkMode(d => !d)}>
             {darkMode ? <Icons.Sun /> : <Icons.Moon />}
             <span>{darkMode ? "Light" : "Dark"}</span>
           </button>
@@ -250,8 +311,8 @@ export default function App() {
           <RoutesTab
             routes={filtered} filter={routeFilter} setFilter={setRouteFilter}
             selected={selectedRoute} onSelect={selectPreset}
-            startLocation={startLocation} setStartLocation={setStartLocation}
-            endLocation={endLocation} setEndLocation={setEndLocation}
+            startLocation={startLocation} setStartLocation={handleStartChange}
+            endLocation={endLocation} setEndLocation={handleEndChange}
             mapsReady={mapsReady} onGoToRun={() => setTab("run")}
             currentLocation={currentLocation}
             customDistanceMi={customDistanceMi} setCustomDistanceMi={setCustomDistanceMi}
@@ -262,15 +323,16 @@ export default function App() {
           <RunTab
             selectedRoute={selectedRoute} pace={pace} setPace={setPace}
             profile={profile} previewCals={previewCals}
-            runActive={runActive} runElapsed={runElapsed}
+            runActive={runActive} runElapsedMs={runElapsedMs} runPaused={runPaused}
             liveDistanceMi={liveDistanceMi} livePace={livePace}
-            startRun={startRun} stopRun={stopRun} fmtTime={fmtTime}
+            startRun={startRun} stopRun={stopRun} pauseRun={pauseRun} resumeRun={resumeRun}
+            fmtTime={fmtTime}
             mapsReady={mapsReady} startLocation={startLocation} endLocation={endLocation}
             currentLocation={currentLocation}
             customDistanceMi={customDistanceMi} customDirection={customDirection}
           />
         )}
-        {tab === "stats" && <StatsTab history={runHistory} />}
+        {tab === "stats" && <StatsTab history={runHistory} onRenameRun={(id, name) => setRunHistory(h => h.map(r => r.id === id ? { ...r, route: name } : r))} />}
         {tab === "profile" && <ProfileTab profile={profile} setProfile={setProfile} />}
       </main>
       <nav style={styles.nav}>
@@ -297,7 +359,6 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const directionsRendererRef = useRef(null);
-  const polylineRef = useRef(null);
   const currentMarkerRef = useRef(null);
   const [devicePosition, setDevicePosition] = useState(null);
   const [loopDirectionsResult, setLoopDirectionsResult] = useState(null);
@@ -329,10 +390,10 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
 
   useEffect(() => {
     if (!navigator.geolocation) return;
-    const handlePosition = (pos) => {
-      setDevicePosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    };
-    navigator.geolocation.getCurrentPosition(handlePosition, () => {}, { enableHighAccuracy: true });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setDevicePosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {}, { enableHighAccuracy: true }
+    );
   }, [mapsReady]);
 
   const positionToShow = currentLocation ?? devicePosition;
@@ -345,22 +406,12 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
       position: positionToShow,
       map: mapInstanceRef.current,
       title: "You are here",
-      icon: {
-        path: maps.SymbolPath.CIRCLE,
-        scale: 10,
-        fillColor: "#9B0000",
-        fillOpacity: 1,
-        strokeColor: "#fff",
-        strokeWeight: 2,
-      },
+      icon: { path: maps.SymbolPath.CIRCLE, scale: 10, fillColor: "#9B0000", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 },
     });
     currentMarkerRef.current = marker;
-    return () => {
-      if (currentMarkerRef.current) currentMarkerRef.current.setMap(null);
-    };
+    return () => { if (currentMarkerRef.current) currentMarkerRef.current.setMap(null); };
   }, [mapsReady, positionToShow?.lat, positionToShow?.lng]);
 
-  // Out-and-back loop: find turnaround so walking path (trails) ≈ loopTargetMi, then show directions
   useEffect(() => {
     if (!mapsReady || !outAndBack || typeof startLocation !== "object" || startLocation?.lat == null) {
       setLoopDirectionsResult(null);
@@ -371,11 +422,8 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
     loopSearchCancelRef.current = false;
 
     (async () => {
-      let low = 0.05;
-      let high = Math.min(targetMi, targetMi * 0.6);
-      let bestResult = null;
-      let bestDiff = Infinity;
-
+      let low = 0.05, high = Math.min(targetMi, targetMi * 0.6);
+      let bestResult = null, bestDiff = Infinity;
       for (let iter = 0; iter < 12; iter++) {
         if (loopSearchCancelRef.current) return;
         const outMi = (low + high) / 2;
@@ -384,40 +432,21 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
           const maps = window.google.maps;
           const svc = new maps.DirectionsService();
           const result = await new Promise((resolve, reject) => {
-            svc.route(
-              {
-                origin: start,
-                destination: start,
-                waypoints: [{ location: waypoint, stopover: true }],
-                travelMode: maps.TravelMode.WALKING,
-              },
-              (res, status) => {
-                if (status === "OK") resolve(res);
-                else reject(new Error(status));
-              }
-            );
+            svc.route({ origin: start, destination: start, waypoints: [{ location: waypoint, stopover: true }], travelMode: maps.TravelMode.WALKING },
+              (res, status) => { if (status === "OK") resolve(res); else reject(new Error(status)); });
           });
           if (loopSearchCancelRef.current) return;
           const totalMeters = result.routes[0].legs.reduce((sum, leg) => sum + (leg.distance?.value ?? 0), 0);
           const totalMi = totalMeters / 1609.34;
           const diff = Math.abs(totalMi - targetMi);
-          if (diff < bestDiff) {
-            bestDiff = diff;
-            bestResult = result;
-          }
+          if (diff < bestDiff) { bestDiff = diff; bestResult = result; }
           if (diff < 0.08) break;
-          if (totalMi < targetMi) low = outMi;
-          else high = outMi;
-        } catch {
-          high = outMi;
-        }
+          if (totalMi < targetMi) low = outMi; else high = outMi;
+        } catch { high = outMi; }
       }
       if (!loopSearchCancelRef.current && bestResult) setLoopDirectionsResult(bestResult);
     })();
-
-    return () => {
-      loopSearchCancelRef.current = true;
-    };
+    return () => { loopSearchCancelRef.current = true; };
   }, [mapsReady, outAndBack, startLocation?.lat, startLocation?.lng, loopTargetMi, loopDirection]);
 
   useEffect(() => {
@@ -435,38 +464,16 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
         const midpoint = route.legs[0].end_location;
         const end = route.legs[1].end_location;
         const labelStyle = { color: "#fff", fontSize: "13px", fontWeight: "700", fontFamily: "inherit" };
-        const markerA = new maps.Marker({
-          position: start,
-          map: mapInstanceRef.current,
-          label: { text: "A", ...labelStyle },
-          zIndex: 3,
-          title: "Start & finish",
-        });
-        const offsetDeg = 0.00015;
-        const markerC = new maps.Marker({
-          position: { lat: end.lat() - offsetDeg, lng: end.lng() },
-          map: mapInstanceRef.current,
-          label: { text: "C", ...labelStyle },
-          zIndex: 2,
-          title: "Start & finish (same as A)",
-        });
-        const markerB = new maps.Marker({
-          position: midpoint,
-          map: mapInstanceRef.current,
-          label: { text: "B", ...labelStyle },
-          zIndex: 4,
-          title: "Midpoint (turnaround)",
-        });
+        const markerA = new maps.Marker({ position: start, map: mapInstanceRef.current, label: { text: "A", ...labelStyle }, zIndex: 3, title: "Start & finish" });
+        const markerC = new maps.Marker({ position: { lat: end.lat() - 0.00015, lng: end.lng() }, map: mapInstanceRef.current, label: { text: "C", ...labelStyle }, zIndex: 2, title: "Start & finish (same as A)" });
+        const markerB = new maps.Marker({ position: midpoint, map: mapInstanceRef.current, label: { text: "B", ...labelStyle }, zIndex: 4, title: "Midpoint (turnaround)" });
         loopMarkersRef.current = [markerA, markerB, markerC];
       }
     } else {
       directionsRendererRef.current.setOptions({ suppressMarkers: false });
       if (outAndBack) directionsRendererRef.current.setDirections({ routes: [] });
     }
-    return () => {
-      loopMarkersRef.current.forEach((m) => m.setMap(null));
-      loopMarkersRef.current = [];
-    };
+    return () => { loopMarkersRef.current.forEach((m) => m.setMap(null)); loopMarkersRef.current = []; };
   }, [mapsReady, outAndBack, loopDirectionsResult]);
 
   useEffect(() => {
@@ -475,13 +482,8 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
     const destination = typeof endLocation === "object" && endLocation?.lat != null ? endLocation : endLocation;
     const maps = window.google.maps;
     const svc = new maps.DirectionsService();
-    svc.route({
-      origin,
-      destination,
-      travelMode: maps.TravelMode.WALKING,
-    }, (result, status) => {
-      if (status === "OK") directionsRendererRef.current.setDirections(result);
-    });
+    svc.route({ origin, destination, travelMode: maps.TravelMode.WALKING },
+      (result, status) => { if (status === "OK") directionsRendererRef.current.setDirections(result); });
   }, [mapsReady, startLocation, endLocation, outAndBack]);
 
   if (!mapsReady) return (
@@ -502,6 +504,12 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
   const inputRef = useRef(null);
   const acRef = useRef(null);
 
+  const displayValue = typeof value === "object" && value?.label
+    ? value.label
+    : typeof value === "object" && value?.lat != null
+    ? "Current position"
+    : (value || "");
+
   useEffect(() => {
     if (!mapsReady || !inputRef.current || acRef.current) return;
     const maps = window.google.maps;
@@ -511,7 +519,9 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
     });
     acRef.current.addListener("place_changed", () => {
       const place = acRef.current.getPlace();
-      if (place.formatted_address) onChange(place.formatted_address);
+      if (place.geometry?.location && place.formatted_address) {
+        onChange({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng(), label: place.formatted_address });
+      }
     });
   }, [mapsReady]);
 
@@ -522,7 +532,7 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
         ref={inputRef}
         style={{ ...styles.input, paddingLeft: 34, marginBottom: 0 }}
         placeholder={placeholder}
-        value={value}
+        value={displayValue}
         onChange={e => onChange(e.target.value)}
       />
     </div>
@@ -532,11 +542,39 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
 // ─── ROUTES TAB ───────────────────────────────────────────────────────────────
 function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocation, setStartLocation, endLocation, setEndLocation, mapsReady, onGoToRun, currentLocation, customDistanceMi, setCustomDistanceMi, customDirection, setCustomDirection }) {
   const { styles } = useTheme();
-  const bothCurrent = !selected && typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null && endLocation?.lat != null;
+  const bothCurrent = !selected && areNearby(startLocation, endLocation);
   const originForMap = startLocation;
-  const destForMap = bothCurrent && currentLocation
-    ? pointAtDistanceMi(currentLocation.lat, currentLocation.lng, parseFloat(customDistanceMi) || 3, customDirection)
+  const anchorLoc = bothCurrent ? startLocation : null;
+  const destForMap = bothCurrent && anchorLoc
+    ? pointAtDistanceMi(anchorLoc.lat, anchorLoc.lng, parseFloat(customDistanceMi) || 3, customDirection)
     : endLocation;
+  const [customRouteDistanceMi, setCustomRouteDistanceMi] = useState(null);
+
+  useEffect(() => {
+    if (!mapsReady || bothCurrent || selected || !startLocation || !endLocation) {
+      setCustomRouteDistanceMi(null);
+      return;
+    }
+    const origin = typeof startLocation === "object" && startLocation?.lat != null ? startLocation : startLocation;
+    const destination = typeof endLocation === "object" && endLocation?.lat != null ? endLocation : endLocation;
+    const maps = window.google?.maps;
+    if (!maps) return;
+    const svc = new maps.DirectionsService();
+    svc.route({ origin, destination, travelMode: maps.TravelMode.WALKING }, (result, status) => {
+      if (status === "OK") {
+        const meters = result.routes[0].legs.reduce((sum, leg) => sum + (leg.distance?.value ?? 0), 0);
+        setCustomRouteDistanceMi(parseFloat((meters / 1609.34).toFixed(2)));
+      } else {
+        setCustomRouteDistanceMi(null);
+      }
+    });
+  }, [mapsReady, bothCurrent, selected, startLocation, endLocation]);
+
+  const displayDistanceMi = selected
+    ? selected.distanceMi
+    : bothCurrent
+    ? (parseFloat(customDistanceMi) || null)
+    : customRouteDistanceMi;
 
   return (
     <div style={styles.tabContent}>
@@ -544,63 +582,38 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
       <div style={styles.card}>
         <div style={styles.cardLabel}>📍 Custom Locations</div>
         <div style={{ marginBottom: 10 }}>
-          <PlacesInput
-            value={typeof startLocation === "object" ? "Current position" : (startLocation || "")}
-            onChange={(v) => setStartLocation(v)}
-            placeholder="Start location"
-            mapsReady={mapsReady}
-          />
+          <PlacesInput value={startLocation} onChange={(v) => setStartLocation(v)} placeholder="Start location" mapsReady={mapsReady} />
           <button
             type="button"
             style={{ ...styles.useCurrentBtn, opacity: currentLocation ? 1 : 0.5, cursor: currentLocation ? "pointer" : "not-allowed" }}
             onClick={() => currentLocation && setStartLocation(currentLocation)}
             disabled={!currentLocation}
-          >
-            📍 Use current position
-          </button>
+          >📍 Use current position</button>
         </div>
         <div style={styles.locationDivider}><div style={styles.routeLine} /><span style={styles.arrowDown}>↓</span><div style={styles.routeLine} /></div>
         <div style={{ marginBottom: 10 }}>
-          <PlacesInput
-            value={typeof endLocation === "object" ? "Current position" : (endLocation || "")}
-            onChange={(v) => setEndLocation(v)}
-            placeholder="End location"
-            mapsReady={mapsReady}
-          />
+          <PlacesInput value={endLocation} onChange={(v) => setEndLocation(v)} placeholder="End location" mapsReady={mapsReady} />
           <button
             type="button"
             style={{ ...styles.useCurrentBtn, opacity: currentLocation ? 1 : 0.5, cursor: currentLocation ? "pointer" : "not-allowed" }}
             onClick={() => currentLocation && setEndLocation(currentLocation)}
             disabled={!currentLocation}
-          >
-            📍 Use current position
-          </button>
+          >📍 Use current position</button>
         </div>
         {bothCurrent && (
           <div style={styles.customRouteCard}>
             <div style={styles.cardLabel}>📏 Personalized Route (out &amp; back)</div>
             <div style={{ marginBottom: 10 }}>
               <label style={styles.inputLabel}>Distance (miles)</label>
-              <input
-                style={styles.input}
-                type="number"
-                min="0.5"
-                max="26"
-                step="0.5"
-                value={customDistanceMi}
-                onChange={(e) => setCustomDistanceMi(e.target.value)}
-              />
+              <input style={styles.input} type="number" min="0.5" max="26" step="0.5" value={customDistanceMi} onChange={(e) => setCustomDistanceMi(e.target.value)} />
             </div>
             <div>
               <label style={styles.inputLabel}>Direction (turnaround point)</label>
               <div style={styles.directionRow}>
                 {["N", "S", "E", "W"].map((dir) => (
-                  <button
-                    key={dir}
-                    type="button"
+                  <button key={dir} type="button"
                     style={{ ...styles.directionBtn, ...(customDirection === dir ? styles.directionBtnActive : {}) }}
-                    onClick={() => setCustomDirection(dir)}
-                  >
+                    onClick={() => setCustomDirection(dir)}>
                     {dir === "N" ? "⬆ North" : dir === "S" ? "⬇ South" : dir === "E" ? "➡ East" : "⬅ West"}
                   </button>
                 ))}
@@ -615,6 +628,12 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
               <div style={styles.loopLegendRow}><strong>B</strong> — Midpoint (turnaround)</div>
               <div style={styles.loopLegendRow}><strong>C</strong> — Start &amp; finish (same as A)</div>
             </div>
+          </div>
+        )}
+        {displayDistanceMi != null && (
+          <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: -0.5, color: "#9B0000", margin: "10px 0 4px", textAlign: "center" }}>
+            {displayDistanceMi}
+            <span style={{ fontSize: 13, fontWeight: 400, opacity: 0.7, letterSpacing: 1, marginLeft: 4 }}>mi</span>
           </div>
         )}
         <LiveMap startLocation={originForMap} endLocation={destForMap} mapsReady={mapsReady} currentLocation={currentLocation} outAndBack={bothCurrent} loopTargetMi={customDistanceMi} loopDirection={customDirection} />
@@ -654,19 +673,41 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
 }
 
 // ─── RUN TAB ──────────────────────────────────────────────────────────────────
-function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runElapsed, liveDistanceMi, livePace, startRun, stopRun, fmtTime, mapsReady, startLocation, endLocation, currentLocation, customDistanceMi, customDirection }) {
+function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runPaused, runElapsedMs, liveDistanceMi, livePace, startRun, stopRun, pauseRun, resumeRun, fmtTime, mapsReady, startLocation, endLocation, currentLocation, customDistanceMi, customDirection }) {
   const { styles } = useTheme();
-  const liveCals = calcCalories({ weightLbs: profile.weight, durationMin: runElapsed / 60, distanceMi: Math.max(liveDistanceMi, 0.01) });
-  const bothCurrent = !selectedRoute && typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null && endLocation?.lat != null;
+  const liveCals = calcCalories({ weightLbs: profile.weight, durationMin: runElapsedMs / 60000, distanceMi: Math.max(liveDistanceMi, 0.01) });
+  const bothCurrent = !selectedRoute && areNearby(startLocation, endLocation);
   const runOrigin = startLocation || selectedRoute?.start;
-  const runDest = bothCurrent && currentLocation
-    ? pointAtDistanceMi(currentLocation.lat, currentLocation.lng, parseFloat(customDistanceMi) || 3, customDirection)
+  const anchorLoc = bothCurrent ? startLocation : null;
+  const runDest = bothCurrent && anchorLoc
+    ? pointAtDistanceMi(anchorLoc.lat, anchorLoc.lng, parseFloat(customDistanceMi) || 3, customDirection)
     : (endLocation || selectedRoute?.end);
   const effectiveDistance = selectedRoute ? selectedRoute.distanceMi : (bothCurrent ? parseFloat(customDistanceMi) || 3 : null);
+  const isRunning = runActive && !runPaused;
+  const isPaused = runActive && runPaused;
 
   return (
     <div style={styles.tabContent}>
       <h2 style={styles.tabTitle}>{selectedRoute ? selectedRoute.name : bothCurrent ? "Personalized Run" : "Custom Run"}</h2>
+      {!runActive && effectiveDistance && (
+        <div style={styles.distanceBanner}>
+          <div style={styles.distanceBannerMain}>
+            <div style={styles.distanceBannerMi}>{effectiveDistance.toFixed(1)}</div>
+            <div style={styles.distanceBannerUnit}>miles</div>
+          </div>
+          <div style={styles.distanceBannerSide}>
+            <div style={styles.distanceBannerStat}>
+              <div style={styles.distanceBannerStatNum}>~{Math.round(effectiveDistance * parseFloat(pace || 9.0))} min</div>
+              <div style={styles.distanceBannerStatLabel}>est. time</div>
+            </div>
+            <div style={styles.distanceBannerDivider} />
+            <div style={styles.distanceBannerStat}>
+              <div style={styles.distanceBannerStatNum}>{pace}</div>
+              <div style={styles.distanceBannerStatLabel}>min / mi</div>
+            </div>
+          </div>
+        </div>
+      )}
       {(startLocation || selectedRoute) && (
         <div style={{ marginBottom: 16 }}>
           {bothCurrent && (
@@ -681,8 +722,10 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
         </div>
       )}
       <div style={styles.timerCard}>
-        <div style={styles.timerTime}>{fmtTime(runElapsed)}</div>
-        <div style={styles.timerLabel}>{runActive ? "● RUNNING" : "READY TO RUN"}</div>
+        <div style={styles.timerTime}>{fmtTime(runElapsedMs)}</div>
+        <div style={styles.timerLabel}>
+          {isRunning ? "● RUNNING" : isPaused ? "⏸ PAUSED" : "READY TO RUN"}
+        </div>
         {runActive && (
           <div style={styles.liveStatsRow}>
             <div style={styles.liveStat}><div style={styles.liveStatNum}>{liveDistanceMi.toFixed(2)}</div><div style={styles.liveStatLabel}>miles</div></div>
@@ -692,10 +735,25 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
             <div style={styles.liveStat}><div style={styles.liveStatNum}>{liveCals}</div><div style={styles.liveStatLabel}>cal</div></div>
           </div>
         )}
-        <button style={{ ...styles.bigBtn, ...(runActive ? styles.bigBtnStop : {}) }} onClick={runActive ? stopRun : startRun}>
-          {runActive ? <Icons.Stop /> : <Icons.Play />}
-        </button>
-        {runActive && <div style={styles.gpsNote}>📡 GPS tracking active</div>}
+        <div style={styles.runControls}>
+          {!runActive && (
+            <button style={styles.bigBtn} onClick={startRun}><Icons.Play /></button>
+          )}
+          {isRunning && (
+            <>
+              <button style={{ ...styles.bigBtn, ...styles.bigBtnPause }} onClick={pauseRun} title="Pause"><Icons.Pause /></button>
+              <button style={styles.endRunBtn} onClick={stopRun}>End run</button>
+            </>
+          )}
+          {isPaused && (
+            <>
+              <button style={styles.bigBtn} onClick={resumeRun} title="Resume"><Icons.Play /></button>
+              <button style={styles.endRunBtn} onClick={stopRun}>End run</button>
+            </>
+          )}
+        </div>
+        {isRunning && <div style={styles.gpsNote}>📡 GPS tracking active</div>}
+        {isPaused && <div style={styles.gpsNote}>Paused — tap Resume to continue</div>}
       </div>
       {!runActive && (
         <div style={styles.card}>
@@ -730,7 +788,7 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
 }
 
 // ─── STATS TAB ────────────────────────────────────────────────────────────────
-function StatsTab({ history }) {
+function StatsTab({ history, onRenameRun }) {
   const { styles } = useTheme();
   const totalCals = history.reduce((a, r) => a + r.calories, 0);
   const totalMi = history.reduce((a, r) => a + r.distanceMi, 0);
@@ -752,7 +810,13 @@ function StatsTab({ history }) {
           {history.map(run => (
             <div key={run.id} style={styles.historyCard}>
               <div style={styles.historyTop}>
-                <span style={styles.historyRoute}>{run.route}</span>
+                <input
+                  type="text"
+                  style={{ ...styles.historyRouteInput, ...styles.historyRoute }}
+                  value={run.route}
+                  onChange={(e) => onRenameRun(run.id, e.target.value)}
+                  placeholder="Run name"
+                />
                 <span style={styles.historyDate}>{run.date}</span>
               </div>
               <div style={styles.historyMeta}>
@@ -889,6 +953,15 @@ function getStyles(C) {
     tagFast: { background: C.accentLight, color: C.accent },
     routeDesc: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
     ctaBtn: { width: "100%", background: C.accent, color: "#fff", fontWeight: 900, fontSize: 15, padding: "14px", borderRadius: 12, border: "none", cursor: "pointer", letterSpacing: 1, marginTop: 4, fontFamily: "inherit", boxShadow: `0 4px 14px ${C.accent}44` },
+    distanceBanner: { display: "flex", alignItems: "stretch", background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 16 },
+    distanceBannerMain: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 16px", borderRight: `1px solid ${C.border}` },
+    distanceBannerMi: { fontSize: 52, fontWeight: 900, letterSpacing: -2, color: C.accent, lineHeight: 1 },
+    distanceBannerUnit: { fontSize: 11, letterSpacing: 3, color: C.muted, textTransform: "uppercase", marginTop: 4 },
+    distanceBannerSide: { display: "flex", flexDirection: "column", justifyContent: "center", gap: 0 },
+    distanceBannerStat: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "12px 20px" },
+    distanceBannerStatNum: { fontSize: 20, fontWeight: 900, color: C.text, letterSpacing: -0.5 },
+    distanceBannerStatLabel: { fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginTop: 2 },
+    distanceBannerDivider: { height: 1, background: C.border, margin: "0 12px" },
     timerCard: { background: C.timerGrad, border: `2px solid ${C.accent}33`, borderRadius: 20, padding: "28px 20px", textAlign: "center", marginBottom: 20 },
     timerTime: { fontSize: 64, fontWeight: 900, letterSpacing: -2, color: C.accent, lineHeight: 1 },
     timerLabel: { fontSize: 11, letterSpacing: 4, color: C.muted, marginTop: 8, marginBottom: 20, textTransform: "uppercase" },
@@ -899,6 +972,9 @@ function getStyles(C) {
     liveStatDivider: { width: 1, height: 32, background: C.border },
     bigBtn: { width: 72, height: 72, borderRadius: "50%", background: C.accent, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", transition: "transform 0.1s", boxShadow: `0 0 24px ${C.accent}44` },
     bigBtnStop: { background: C.accentDark, boxShadow: `0 0 24px ${C.accentDark}44` },
+    bigBtnPause: { background: "#b8860b", boxShadow: "0 0 24px rgba(184,134,11,0.4)" },
+    runControls: { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginTop: 8 },
+    endRunBtn: { background: "transparent", color: C.muted, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: "10px 20px", fontSize: 12, cursor: "pointer", fontFamily: "inherit", letterSpacing: 1 },
     gpsNote: { fontSize: 11, color: C.muted, marginTop: 12 },
     routeSummary: { display: "flex", gap: 20, fontSize: 13, color: C.muted, marginTop: 4 },
     calCard: { background: C.calGrad, border: `1.5px solid ${C.accent}33`, borderRadius: 16, padding: 24, textAlign: "center" },
@@ -911,8 +987,9 @@ function getStyles(C) {
     statLabel: { fontSize: 10, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginTop: 4 },
     emptyState: { textAlign: "center", padding: "40px 20px", color: C.muted },
     historyCard: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, marginBottom: 10 },
-    historyTop: { display: "flex", justifyContent: "space-between", marginBottom: 8 },
+    historyTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 },
     historyRoute: { fontWeight: 700, fontSize: 14 },
+    historyRouteInput: { background: "transparent", border: "none", outline: "none", padding: 0, flex: 1, minWidth: 0, fontFamily: "inherit", color: "inherit" },
     historyDate: { fontSize: 11, color: C.muted },
     historyMeta: { display: "flex", gap: 14, fontSize: 12, color: C.muted, flexWrap: "wrap" },
     gpsBadge: { background: C.accentLight, color: C.accent, fontSize: 10, padding: "1px 7px", borderRadius: 10, fontWeight: 600 },

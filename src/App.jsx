@@ -75,6 +75,7 @@ const Icons = {
   ChevronRight: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><polyline points="9,18 15,12 9,6"/></svg>),
   Play: () => (<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="5,3 19,12 5,21"/></svg>),
   Stop: () => (<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>),
+  Pause: () => (<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>),
   Location: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 00-8 8c0 5.25 8 13 8 13s8-7.75 8-13a8 8 0 00-8-8z"/></svg>),
   Moon: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>),
   Sun: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>),
@@ -103,6 +104,7 @@ export default function App() {
   const [customDirection, setCustomDirection] = useState("N");
   const [pace, setPace] = useState("9.0"); // min/mile
   const [runActive, setRunActive] = useState(false);
+  const [runPaused, setRunPaused] = useState(false);
   const [runElapsed, setRunElapsed] = useState(0);
   const [runHistory, setRunHistory] = useState([]);
   const [liveDistanceMi, setLiveDistanceMi] = useState(0);
@@ -134,20 +136,52 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (runActive) {
+    if (runActive && !runPaused) {
       timerRef.current = setInterval(() => setRunElapsed(s => s + 1), 1000);
     } else {
       clearInterval(timerRef.current);
     }
     return () => clearInterval(timerRef.current);
-  }, [runActive]);
+  }, [runActive, runPaused]);
 
   const startRun = () => {
     setRunElapsed(0);
     setLiveDistanceMi(0);
     liveDistanceRef.current = 0;
     gpsPathRef.current = [];
+    setRunPaused(false);
     setRunActive(true);
+    if (navigator.geolocation) {
+      gpsWatchRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setCurrentLocation({ lat: latitude, lng: longitude });
+          const path = gpsPathRef.current;
+          if (path.length > 0) {
+            const last = path[path.length - 1];
+            const added = haversineMi(last.lat, last.lng, latitude, longitude);
+            const newTotal = parseFloat((liveDistanceRef.current + added).toFixed(3));
+            liveDistanceRef.current = newTotal;
+            setLiveDistanceMi(newTotal);
+          }
+          gpsPathRef.current = [...path, { lat: latitude, lng: longitude }];
+        },
+        (err) => console.warn("GPS error:", err),
+        { enableHighAccuracy: true, maximumAge: 0 }
+      );
+    }
+  };
+
+  const pauseRun = () => {
+    setRunPaused(true);
+    if (gpsWatchRef.current) {
+      navigator.geolocation.clearWatch(gpsWatchRef.current);
+      gpsWatchRef.current = null;
+    }
+  };
+
+  const resumeRun = () => {
+    setRunPaused(false);
     if (navigator.geolocation) {
       gpsWatchRef.current = navigator.geolocation.watchPosition(
         (pos) => {
@@ -171,6 +205,7 @@ export default function App() {
 
   const stopRun = () => {
     setRunActive(false);
+    setRunPaused(false);
     if (gpsWatchRef.current) {
       navigator.geolocation.clearWatch(gpsWatchRef.current);
       gpsWatchRef.current = null;
@@ -204,7 +239,7 @@ export default function App() {
       : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
-  const livePace = runActive && liveDistanceMi > 0.05 && runElapsed > 0
+  const livePace = runActive && !runPaused && liveDistanceMi > 0.05 && runElapsed > 0
     ? ((runElapsed / 60) / liveDistanceMi).toFixed(1)
     : pace;
 
@@ -258,8 +293,10 @@ export default function App() {
             selectedRoute={selectedRoute} pace={pace} setPace={setPace}
             profile={profile} previewCals={previewCals}
             runActive={runActive} runElapsed={runElapsed}
+            runPaused={runPaused}
             liveDistanceMi={liveDistanceMi} livePace={livePace}
-            startRun={startRun} stopRun={stopRun} fmtTime={fmtTime}
+            startRun={startRun} stopRun={stopRun} pauseRun={pauseRun} resumeRun={resumeRun}
+            fmtTime={fmtTime}
             mapsReady={mapsReady} startLocation={startLocation} endLocation={endLocation}
             currentLocation={currentLocation}
             customDistanceMi={customDistanceMi} customDirection={customDirection}
@@ -529,7 +566,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
 }
 
 // ─── RUN TAB ──────────────────────────────────────────────────────────────────
-function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runElapsed, liveDistanceMi, livePace, startRun, stopRun, fmtTime, mapsReady, startLocation, endLocation, currentLocation, customDistanceMi, customDirection }) {
+function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runPaused, runElapsed, liveDistanceMi, livePace, startRun, stopRun, pauseRun, resumeRun, fmtTime, mapsReady, startLocation, endLocation, currentLocation, customDistanceMi, customDirection }) {
   const { styles } = useTheme();
   const liveCals = calcCalories({ weightLbs: profile.weight, durationMin: runElapsed / 60, distanceMi: Math.max(liveDistanceMi, 0.01) });
   const bothCurrent = typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null && endLocation?.lat != null;
@@ -538,6 +575,8 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
     ? pointAtDistanceMi(currentLocation.lat, currentLocation.lng, parseFloat(customDistanceMi) || 3, customDirection)
     : (endLocation || selectedRoute?.end);
   const effectiveDistance = selectedRoute ? selectedRoute.distanceMi : (bothCurrent ? parseFloat(customDistanceMi) || 3 : null);
+  const isRunning = runActive && !runPaused;
+  const isPaused = runActive && runPaused;
 
   return (
     <div style={styles.tabContent}>
@@ -549,7 +588,9 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
       )}
       <div style={styles.timerCard}>
         <div style={styles.timerTime}>{fmtTime(runElapsed)}</div>
-        <div style={styles.timerLabel}>{runActive ? "● RUNNING" : "READY TO RUN"}</div>
+        <div style={styles.timerLabel}>
+          {isRunning ? "● RUNNING" : isPaused ? "⏸ PAUSED" : "READY TO RUN"}
+        </div>
         {runActive && (
           <div style={styles.liveStatsRow}>
             <div style={styles.liveStat}><div style={styles.liveStatNum}>{liveDistanceMi.toFixed(2)}</div><div style={styles.liveStatLabel}>miles</div></div>
@@ -559,10 +600,31 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
             <div style={styles.liveStat}><div style={styles.liveStatNum}>{liveCals}</div><div style={styles.liveStatLabel}>cal</div></div>
           </div>
         )}
-        <button style={{ ...styles.bigBtn, ...(runActive ? styles.bigBtnStop : {}) }} onClick={runActive ? stopRun : startRun}>
-          {runActive ? <Icons.Stop /> : <Icons.Play />}
-        </button>
-        {runActive && <div style={styles.gpsNote}>📡 GPS tracking active</div>}
+        <div style={styles.runControls}>
+          {!runActive && (
+            <button style={styles.bigBtn} onClick={startRun}>
+              <Icons.Play />
+            </button>
+          )}
+          {isRunning && (
+            <>
+              <button style={{ ...styles.bigBtn, ...styles.bigBtnPause }} onClick={pauseRun} title="Pause">
+                <Icons.Pause />
+              </button>
+              <button style={styles.endRunBtn} onClick={stopRun}>End run</button>
+            </>
+          )}
+          {isPaused && (
+            <>
+              <button style={styles.bigBtn} onClick={resumeRun} title="Resume">
+                <Icons.Play />
+              </button>
+              <button style={styles.endRunBtn} onClick={stopRun}>End run</button>
+            </>
+          )}
+        </div>
+        {isRunning && <div style={styles.gpsNote}>📡 GPS tracking active</div>}
+        {isPaused && <div style={styles.gpsNote}>Paused — tap Resume to continue</div>}
       </div>
       {!runActive && (
         <div style={styles.card}>
@@ -763,6 +825,9 @@ function getStyles(C) {
     liveStatDivider: { width: 1, height: 32, background: C.border },
     bigBtn: { width: 72, height: 72, borderRadius: "50%", background: C.accent, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", transition: "transform 0.1s", boxShadow: `0 0 24px ${C.accent}44` },
     bigBtnStop: { background: C.accentDark, boxShadow: `0 0 24px ${C.accentDark}44` },
+    bigBtnPause: { background: "#b8860b", boxShadow: "0 0 24px rgba(184,134,11,0.4)" },
+    runControls: { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginTop: 8 },
+    endRunBtn: { background: "transparent", color: C.muted, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: "10px 20px", fontSize: 12, cursor: "pointer", fontFamily: "inherit", letterSpacing: 1 },
     gpsNote: { fontSize: 11, color: C.muted, marginTop: 12 },
     routeSummary: { display: "flex", gap: 20, fontSize: 13, color: C.muted, marginTop: 4 },
     calCard: { background: C.calGrad, border: `1.5px solid ${C.accent}33`, borderRadius: 16, padding: 24, textAlign: "center" },

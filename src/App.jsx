@@ -612,6 +612,32 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
   const destForMap = bothCurrent && anchorLoc
     ? pointAtDistanceMi(anchorLoc.lat, anchorLoc.lng, parseFloat(customDistanceMi) || 3, customDirection)
     : endLocation;
+  const [customRouteDistanceMi, setCustomRouteDistanceMi] = useState(null);
+
+  // Fetch walking route distance for custom start/end (point-to-point only)
+  useEffect(() => {
+    if (!mapsReady || bothCurrent || !startLocation || !endLocation) {
+      setCustomRouteDistanceMi(null);
+      return;
+    }
+    const origin = typeof startLocation === "object" && startLocation?.lat != null ? startLocation : startLocation;
+    const destination = typeof endLocation === "object" && endLocation?.lat != null ? endLocation : endLocation;
+    const maps = window.google?.maps;
+    if (!maps) return;
+    const svc = new maps.DirectionsService();
+    svc.route({
+      origin,
+      destination,
+      travelMode: maps.TravelMode.WALKING,
+    }, (result, status) => {
+      if (status === "OK") {
+        const meters = result.routes[0].legs.reduce((sum, leg) => sum + (leg.distance?.value ?? 0), 0);
+        setCustomRouteDistanceMi(parseFloat((meters / 1609.34).toFixed(2)));
+      } else {
+        setCustomRouteDistanceMi(null);
+      }
+    });
+  }, [mapsReady, bothCurrent, startLocation, endLocation]);
 
   return (
     <div style={styles.tabContent}>
@@ -620,7 +646,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
         <div style={styles.cardLabel}>📍 Custom Locations</div>
         <div style={{ marginBottom: 10 }}>
           <PlacesInput
-            value={typeof startLocation === "object" ? "Current position" : (startLocation || "")}
+            value={startLocation}
             onChange={(v) => setStartLocation(v)}
             placeholder="Start location"
             mapsReady={mapsReady}
@@ -637,7 +663,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
         <div style={styles.locationDivider}><div style={styles.routeLine} /><span style={styles.arrowDown}>↓</span><div style={styles.routeLine} /></div>
         <div style={{ marginBottom: 10 }}>
           <PlacesInput
-            value={typeof endLocation === "object" ? "Current position" : (endLocation || "")}
+            value={endLocation}
             onChange={(v) => setEndLocation(v)}
             placeholder="End location"
             mapsReady={mapsReady}
@@ -693,6 +719,16 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
           </div>
         )}
         <LiveMap startLocation={originForMap} endLocation={destForMap} mapsReady={mapsReady} currentLocation={currentLocation} outAndBack={bothCurrent} loopTargetMi={customDistanceMi} loopDirection={customDirection} />
+        {customRouteDistanceMi != null && (
+          <div style={{ ...styles.routeSummary, marginTop: 12 }}>
+            <span>📏 Route distance: <strong>{customRouteDistanceMi} mi</strong> </span>
+          </div>
+        )}
+        {bothCurrent && (parseFloat(customDistanceMi) || 0) > 0 && (
+          <div style={{ ...styles.routeSummary, marginTop: 12 }}>
+            <span>📏 Route distance: <strong>{parseFloat(customDistanceMi) || 3} mi</strong> (out &amp; back)</span>
+          </div>
+        )}
       </div>
       <div style={styles.filterRow}>
         {["all", "scenic", "fast"].map(f => (

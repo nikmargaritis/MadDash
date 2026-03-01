@@ -90,6 +90,7 @@ export default function App() {
   const [runElapsed, setRunElapsed] = useState(0);
   const [runHistory, setRunHistory] = useState([]);
   const [liveDistanceMi, setLiveDistanceMi] = useState(0);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [mapsReady, setMapsReady] = useState(false);
   const timerRef = useRef(null);
   const gpsWatchRef = useRef(null);
@@ -105,6 +106,14 @@ export default function App() {
 
   useEffect(() => {
     loadGoogleMaps().then(() => setMapsReady(true)).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const handlePosition = (pos) => {
+      setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    };
+    navigator.geolocation.getCurrentPosition(handlePosition, () => {}, { enableHighAccuracy: true });
   }, []);
 
   useEffect(() => {
@@ -125,6 +134,7 @@ export default function App() {
       gpsWatchRef.current = navigator.geolocation.watchPosition(
         (pos) => {
           const { latitude, longitude } = pos.coords;
+          setCurrentLocation({ lat: latitude, lng: longitude });
           const path = gpsPathRef.current;
           if (path.length > 0) {
             const last = path[path.length - 1];
@@ -213,6 +223,7 @@ export default function App() {
             startLocation={startLocation} setStartLocation={setStartLocation}
             endLocation={endLocation} setEndLocation={setEndLocation}
             mapsReady={mapsReady} onGoToRun={() => setTab("run")}
+            currentLocation={currentLocation}
           />
         )}
         {tab === "run" && (
@@ -223,6 +234,7 @@ export default function App() {
             liveDistanceMi={liveDistanceMi} livePace={livePace}
             startRun={startRun} stopRun={stopRun} fmtTime={fmtTime}
             mapsReady={mapsReady} startLocation={startLocation} endLocation={endLocation}
+            currentLocation={currentLocation}
           />
         )}
         {tab === "stats" && <StatsTab history={runHistory} />}
@@ -247,11 +259,13 @@ export default function App() {
 }
 
 // ─── MAP COMPONENT ────────────────────────────────────────────────────────────
-function LiveMap({ startLocation, endLocation, mapsReady, height = 220 }) {
+function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentLocation = null }) {
   const { styles } = useTheme();
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const directionsRendererRef = useRef(null);
+  const currentMarkerRef = useRef(null);
+  const [devicePosition, setDevicePosition] = useState(null);
 
   useEffect(() => {
     if (!mapsReady || !mapRef.current) return;
@@ -274,6 +288,39 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220 }) {
     renderer.setMap(map);
     directionsRendererRef.current = renderer;
   }, [mapsReady]);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const handlePosition = (pos) => {
+      setDevicePosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    };
+    navigator.geolocation.getCurrentPosition(handlePosition, () => {}, { enableHighAccuracy: true });
+  }, [mapsReady]);
+
+  const positionToShow = currentLocation ?? devicePosition;
+
+  useEffect(() => {
+    if (!mapsReady || !mapInstanceRef.current || !positionToShow) return;
+    if (currentMarkerRef.current) currentMarkerRef.current.setMap(null);
+    const maps = window.google.maps;
+    const marker = new maps.Marker({
+      position: positionToShow,
+      map: mapInstanceRef.current,
+      title: "You are here",
+      icon: {
+        path: maps.SymbolPath.CIRCLE,
+        scale: 10,
+        fillColor: "#9B0000",
+        fillOpacity: 1,
+        strokeColor: "#fff",
+        strokeWeight: 2,
+      },
+    });
+    currentMarkerRef.current = marker;
+    return () => {
+      if (currentMarkerRef.current) currentMarkerRef.current.setMap(null);
+    };
+  }, [mapsReady, positionToShow?.lat, positionToShow?.lng]);
 
   useEffect(() => {
     if (!mapsReady || !mapInstanceRef.current || !startLocation || !endLocation) return;
@@ -334,7 +381,7 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
 }
 
 // ─── ROUTES TAB ───────────────────────────────────────────────────────────────
-function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocation, setStartLocation, endLocation, setEndLocation, mapsReady, onGoToRun }) {
+function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocation, setStartLocation, endLocation, setEndLocation, mapsReady, onGoToRun, currentLocation }) {
   const { styles } = useTheme();
   return (
     <div style={styles.tabContent}>
@@ -344,7 +391,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
         <PlacesInput value={startLocation} onChange={setStartLocation} placeholder="Start location" mapsReady={mapsReady} />
         <div style={styles.locationDivider}><div style={styles.routeLine} /><span style={styles.arrowDown}>↓</span><div style={styles.routeLine} /></div>
         <PlacesInput value={endLocation} onChange={setEndLocation} placeholder="End location" mapsReady={mapsReady} />
-        <LiveMap startLocation={startLocation} endLocation={endLocation} mapsReady={mapsReady} />
+        <LiveMap startLocation={startLocation} endLocation={endLocation} mapsReady={mapsReady} currentLocation={currentLocation} />
       </div>
       <div style={styles.filterRow}>
         {["all", "scenic", "fast"].map(f => (
@@ -381,7 +428,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
 }
 
 // ─── RUN TAB ──────────────────────────────────────────────────────────────────
-function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runElapsed, liveDistanceMi, livePace, startRun, stopRun, fmtTime, mapsReady, startLocation, endLocation }) {
+function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runElapsed, liveDistanceMi, livePace, startRun, stopRun, fmtTime, mapsReady, startLocation, endLocation, currentLocation }) {
   const { styles } = useTheme();
   const liveCals = calcCalories({ weightLbs: profile.weight, durationMin: runElapsed / 60, distanceMi: Math.max(liveDistanceMi, 0.01) });
 
@@ -390,7 +437,7 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
       <h2 style={styles.tabTitle}>{selectedRoute ? selectedRoute.name : "Custom Run"}</h2>
       {(startLocation || selectedRoute) && (
         <div style={{ marginBottom: 16 }}>
-          <LiveMap startLocation={startLocation || selectedRoute?.start} endLocation={endLocation || selectedRoute?.end} mapsReady={mapsReady} height={180} />
+          <LiveMap startLocation={startLocation || selectedRoute?.start} endLocation={endLocation || selectedRoute?.end} mapsReady={mapsReady} height={180} currentLocation={currentLocation} />
         </div>
       )}
       <div style={styles.timerCard}>

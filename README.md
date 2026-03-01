@@ -4,7 +4,7 @@ A React app for tracking runs with route selection, calorie estimation, and Goog
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Install Node.js
 Download from https://nodejs.org (LTS version recommended, v18+).
@@ -33,7 +33,7 @@ Open http://localhost:5173 in your browser to see MadDash!
 
 ---
 
-## 📱 Features
+## Features
 
 | Feature | Description | Status |
 |--------|-------------|--------|
@@ -49,7 +49,7 @@ Open http://localhost:5173 in your browser to see MadDash!
 
 ---
 
-## 🧮 How It Works
+## How It Works
 
 ### GPS Live Tracking
 When a run is started, the app uses `navigator.geolocation.watchPosition` to track the user's movement. It calculates the distance between GPS coordinates using the **Haversine formula** and accumulates the total distance traveled.

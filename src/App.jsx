@@ -324,10 +324,11 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
 
   useEffect(() => {
     if (!mapsReady || !mapInstanceRef.current || !startLocation || !endLocation) return;
+    const origin = typeof startLocation === "object" && startLocation?.lat != null ? startLocation : startLocation;
     const maps = window.google.maps;
     const svc = new maps.DirectionsService();
     svc.route({
-      origin: startLocation,
+      origin,
       destination: endLocation,
       travelMode: maps.TravelMode.WALKING,
     }, (result, status) => {
@@ -388,7 +389,22 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
       <h2 style={styles.tabTitle}>Choose Your Route</h2>
       <div style={styles.card}>
         <div style={styles.cardLabel}>📍 Custom Locations</div>
-        <PlacesInput value={startLocation} onChange={setStartLocation} placeholder="Start location" mapsReady={mapsReady} />
+        <div style={{ marginBottom: 10 }}>
+          <PlacesInput
+            value={typeof startLocation === "object" ? "Current position" : (startLocation || "")}
+            onChange={(v) => setStartLocation(v)}
+            placeholder="Start location"
+            mapsReady={mapsReady}
+          />
+          <button
+            type="button"
+            style={{ ...styles.useCurrentBtn, opacity: currentLocation ? 1 : 0.5, cursor: currentLocation ? "pointer" : "not-allowed" }}
+            onClick={() => currentLocation && setStartLocation(currentLocation)}
+            disabled={!currentLocation}
+          >
+            📍 Use current position
+          </button>
+        </div>
         <div style={styles.locationDivider}><div style={styles.routeLine} /><span style={styles.arrowDown}>↓</span><div style={styles.routeLine} /></div>
         <PlacesInput value={endLocation} onChange={setEndLocation} placeholder="End location" mapsReady={mapsReady} />
         <LiveMap startLocation={startLocation} endLocation={endLocation} mapsReady={mapsReady} currentLocation={currentLocation} />
@@ -616,6 +632,7 @@ function getStyles(C) {
     cardLabel: { fontSize: 9, letterSpacing: 3, color: C.muted, textTransform: "uppercase", marginBottom: 12 },
     input: { width: "100%", background: C.inputBg, border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, padding: "10px 12px", boxSizing: "border-box", fontFamily: "inherit", outline: "none", marginBottom: 10 },
     inputIcon: { position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.muted, pointerEvents: "none", display: "flex", alignItems: "center" },
+    useCurrentBtn: { marginTop: 6, padding: "6px 10px", fontSize: 12, background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, color: C.muted, cursor: "pointer", opacity: 0.9 },
     inputRow: { display: "flex", gap: 10 },
     inputGroup: { flex: 1, display: "flex", flexDirection: "column" },
     inputLabel: { fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6, textTransform: "uppercase" },

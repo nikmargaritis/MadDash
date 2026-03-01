@@ -302,6 +302,7 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
   const [devicePosition, setDevicePosition] = useState(null);
   const [loopDirectionsResult, setLoopDirectionsResult] = useState(null);
   const loopSearchCancelRef = useRef(false);
+  const loopMarkersRef = useRef([]);
 
   useEffect(() => {
     if (!mapsReady || !mapRef.current) return;
@@ -320,6 +321,7 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
     mapInstanceRef.current = map;
     const renderer = new maps.DirectionsRenderer({
       polylineOptions: { strokeColor: "#9B0000", strokeWeight: 5 },
+      suppressMarkers: false,
     });
     renderer.setMap(map);
     directionsRendererRef.current = renderer;
@@ -419,13 +421,53 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
   }, [mapsReady, outAndBack, startLocation?.lat, startLocation?.lng, loopTargetMi, loopDirection]);
 
   useEffect(() => {
-    if (!mapInstanceRef.current || !directionsRendererRef.current) return;
+    if (!mapsReady || !mapInstanceRef.current || !directionsRendererRef.current) return;
+    const maps = window.google.maps;
+    loopMarkersRef.current.forEach((m) => m.setMap(null));
+    loopMarkersRef.current = [];
+
     if (outAndBack && loopDirectionsResult) {
+      directionsRendererRef.current.setOptions({ suppressMarkers: true });
       directionsRendererRef.current.setDirections(loopDirectionsResult);
-    } else if (outAndBack) {
-      directionsRendererRef.current.setDirections({ routes: [] });
+      const route = loopDirectionsResult.routes[0];
+      if (route?.legs?.length >= 2) {
+        const start = route.legs[0].start_location;
+        const midpoint = route.legs[0].end_location;
+        const end = route.legs[1].end_location;
+        const labelStyle = { color: "#fff", fontSize: "13px", fontWeight: "700", fontFamily: "inherit" };
+        const markerA = new maps.Marker({
+          position: start,
+          map: mapInstanceRef.current,
+          label: { text: "A", ...labelStyle },
+          zIndex: 3,
+          title: "Start & finish",
+        });
+        const offsetDeg = 0.00015;
+        const markerC = new maps.Marker({
+          position: { lat: end.lat() - offsetDeg, lng: end.lng() },
+          map: mapInstanceRef.current,
+          label: { text: "C", ...labelStyle },
+          zIndex: 2,
+          title: "Start & finish (same as A)",
+        });
+        const markerB = new maps.Marker({
+          position: midpoint,
+          map: mapInstanceRef.current,
+          label: { text: "B", ...labelStyle },
+          zIndex: 4,
+          title: "Midpoint (turnaround)",
+        });
+        loopMarkersRef.current = [markerA, markerB, markerC];
+      }
+    } else {
+      directionsRendererRef.current.setOptions({ suppressMarkers: false });
+      if (outAndBack) directionsRendererRef.current.setDirections({ routes: [] });
     }
-  }, [outAndBack, loopDirectionsResult]);
+    return () => {
+      loopMarkersRef.current.forEach((m) => m.setMap(null));
+      loopMarkersRef.current = [];
+    };
+  }, [mapsReady, outAndBack, loopDirectionsResult]);
 
   useEffect(() => {
     if (!mapsReady || !mapInstanceRef.current || !startLocation || !endLocation || outAndBack) return;
@@ -567,6 +609,12 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
                 Run {(parseFloat(customDistanceMi) || 3) / 2} mi {customDirection === "N" ? "north" : customDirection === "S" ? "south" : customDirection === "E" ? "east" : "west"}, then return.
               </div>
             </div>
+            <div style={styles.loopLegend}>
+              <div style={styles.loopLegendTitle}>Route labels on map</div>
+              <div style={styles.loopLegendRow}><strong>A</strong> — Start &amp; finish</div>
+              <div style={styles.loopLegendRow}><strong>B</strong> — Midpoint (turnaround)</div>
+              <div style={styles.loopLegendRow}><strong>C</strong> — Start &amp; finish (same as A)</div>
+            </div>
           </div>
         )}
         <LiveMap startLocation={originForMap} endLocation={destForMap} mapsReady={mapsReady} currentLocation={currentLocation} outAndBack={bothCurrent} loopTargetMi={customDistanceMi} loopDirection={customDirection} />
@@ -621,6 +669,14 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
       <h2 style={styles.tabTitle}>{selectedRoute ? selectedRoute.name : bothCurrent ? "Personalized Run" : "Custom Run"}</h2>
       {(startLocation || selectedRoute) && (
         <div style={{ marginBottom: 16 }}>
+          {bothCurrent && (
+            <div style={styles.loopLegend}>
+              <div style={styles.loopLegendTitle}>Route labels on map</div>
+              <div style={styles.loopLegendRow}><strong>A</strong> — Start &amp; finish</div>
+              <div style={styles.loopLegendRow}><strong>B</strong> — Midpoint (turnaround)</div>
+              <div style={styles.loopLegendRow}><strong>C</strong> — Start &amp; finish (same as A)</div>
+            </div>
+          )}
           <LiveMap startLocation={runOrigin} endLocation={runDest} mapsReady={mapsReady} height={180} currentLocation={currentLocation} outAndBack={bothCurrent} loopTargetMi={customDistanceMi} loopDirection={customDirection} />
         </div>
       )}
@@ -799,6 +855,9 @@ function getStyles(C) {
     card: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 16 },
     cardLabel: { fontSize: 9, letterSpacing: 3, color: C.muted, textTransform: "uppercase", marginBottom: 12 },
     mutedText: { fontSize: 11, color: C.muted, marginTop: 8 },
+    loopLegend: { background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", marginTop: 12, marginBottom: 8 },
+    loopLegendTitle: { fontSize: 9, letterSpacing: 2, color: C.muted, textTransform: "uppercase", marginBottom: 8 },
+    loopLegendRow: { fontSize: 12, color: C.text, marginBottom: 4, lineHeight: 1.4 },
     input: { width: "100%", background: C.inputBg, border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, padding: "10px 12px", boxSizing: "border-box", fontFamily: "inherit", outline: "none", marginBottom: 10 },
     inputIcon: { position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.muted, pointerEvents: "none", display: "flex", alignItems: "center" },
     useCurrentBtn: { marginTop: 6, padding: "6px 10px", fontSize: 12, background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, color: C.muted, cursor: "pointer", opacity: 0.9 },

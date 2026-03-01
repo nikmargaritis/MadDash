@@ -48,7 +48,7 @@ function haversineMi(lat1, lon1, lat2, lon2) {
 function areNearby(a, b) {
   if (typeof a !== "object" || a?.lat == null) return false;
   if (typeof b !== "object" || b?.lat == null) return false;
-  return haversineMi(a.lat, a.lng, b.lat, b.lng) < 0.5;
+  return haversineMi(a.lat, a.lng, b.lat, b.lng) < 0.05;
 }
 
 // ─── CALORIE CALC ────────────────────────────────────────────────────────────
@@ -233,7 +233,7 @@ export default function App() {
     const customDist = parseFloat(customDistanceMi) || 3;
     const distanceMi = liveDistanceMi > 0.05
       ? liveDistanceMi
-      : selectedRoute ? selectedRoute.distanceMi : bothCurrent ? customDist : durationMin / parseFloat(pace || 9.0);
+      : selectedRoute ? selectedRoute.distanceMi : bothCurrent ? customDist : (parseFloat(pace) > 0 && durationMin > 0 ? durationMin / parseFloat(pace) : 0);
     const cals = calcCalories({ weightLbs: profile.weight, durationMin, distanceMi });
     const routeName = selectedRoute
       ? selectedRoute.name
@@ -499,10 +499,14 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
 }
 
 // ─── PLACES AUTOCOMPLETE INPUT ────────────────────────────────────────────────
-function PlacesInput({ value, onChange, placeholder, mapsReady }) {
+let placesInputCounter = 0;
+function PlacesInput({ value, onChange, placeholder, mapsReady, locationBias }) {
   const { styles } = useTheme();
   const inputRef = useRef(null);
   const acRef = useRef(null);
+  const idRef = useRef(`places-input-${++placesInputCounter}`);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; });
 
   const displayValue = typeof value === "object" && value?.label
     ? value.label
@@ -513,14 +517,26 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
   useEffect(() => {
     if (!mapsReady || !inputRef.current || acRef.current) return;
     const maps = window.google.maps;
+
+    // Bias results toward user's GPS location, or fall back to Madison, WI center
+    const biasLat = locationBias?.lat ?? 43.0731;
+    const biasLng = locationBias?.lng ?? -89.4012;
+    const delta = 0.18; // ~12-mile radius
+    const bounds = new maps.LatLngBounds(
+      { lat: biasLat - delta, lng: biasLng - delta },
+      { lat: biasLat + delta, lng: biasLng + delta }
+    );
+
     acRef.current = new maps.places.Autocomplete(inputRef.current, {
       componentRestrictions: { country: "us" },
       fields: ["formatted_address", "geometry"],
+      bounds,
+      strictBounds: false, // still allow outside results if nothing found nearby
     });
     acRef.current.addListener("place_changed", () => {
       const place = acRef.current.getPlace();
       if (place.geometry?.location && place.formatted_address) {
-        onChange({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng(), label: place.formatted_address });
+        onChangeRef.current({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng(), label: place.formatted_address });
       }
     });
   }, [mapsReady]);
@@ -530,6 +546,9 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
       <span style={styles.inputIcon}><Icons.Location /></span>
       <input
         ref={inputRef}
+        id={idRef.current}
+        name={idRef.current}
+        autoComplete="off"
         style={{ ...styles.input, paddingLeft: 34, marginBottom: 0 }}
         placeholder={placeholder}
         value={displayValue}
@@ -582,7 +601,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
       <div style={styles.card}>
         <div style={styles.cardLabel}>📍 Custom Locations</div>
         <div style={{ marginBottom: 10 }}>
-          <PlacesInput value={startLocation} onChange={(v) => setStartLocation(v)} placeholder="Start location" mapsReady={mapsReady} />
+          <PlacesInput value={startLocation} onChange={(v) => setStartLocation(v)} placeholder="Start location" mapsReady={mapsReady} locationBias={currentLocation} />
           <button
             type="button"
             style={{ ...styles.useCurrentBtn, opacity: currentLocation ? 1 : 0.5, cursor: currentLocation ? "pointer" : "not-allowed" }}
@@ -592,7 +611,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
         </div>
         <div style={styles.locationDivider}><div style={styles.routeLine} /><span style={styles.arrowDown}>↓</span><div style={styles.routeLine} /></div>
         <div style={{ marginBottom: 10 }}>
-          <PlacesInput value={endLocation} onChange={(v) => setEndLocation(v)} placeholder="End location" mapsReady={mapsReady} />
+          <PlacesInput value={endLocation} onChange={(v) => setEndLocation(v)} placeholder="End location" mapsReady={mapsReady} locationBias={currentLocation} />
           <button
             type="button"
             style={{ ...styles.useCurrentBtn, opacity: currentLocation ? 1 : 0.5, cursor: currentLocation ? "pointer" : "not-allowed" }}

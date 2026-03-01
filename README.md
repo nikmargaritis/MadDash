@@ -9,13 +9,13 @@ A React app for tracking runs with route selection, calorie estimation, and Goog
 ## Screenshots
 
 <p align="center">
-  <img src="routes.png" alt="Routes Tab" width="23%" />
+  <img src="./public/routes.png" alt="Routes Tab" width="23%" />
   &nbsp;
-  <img src="run.png" alt="Run Tracker Tab" width="23%" />
+  <img src="./public/run.png" alt="Run Tracker Tab" width="23%" />
   &nbsp;
-  <img src="stats.png" alt="Stats & History" width="23%" />
+  <img src="./public/stats.png" alt="Stats & History" width="23%" />
   &nbsp;
-  <img src="profile.png" alt="User Profile" width="23%" />
+  <img src="./public/profile.png" alt="User Profile" width="23%" />
 </p>
 
 ---

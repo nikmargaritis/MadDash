@@ -6,6 +6,9 @@
 
 A React app for tracking runs with route selection, calorie estimation, and Google Maps integration. Developed for runners around UW Madison.
 
+## Demo Link
+Watch our app in action: [MadDash Demo](https://youtu.be/8iL81mSsoBI?si=NGf5PCIljNHjdfUb)
+
 ## Screenshots
 
 <p align="center">

@@ -15,17 +15,22 @@ const lbsToKg = (lbs) => lbs * 0.453592;
 const miToKm  = (mi)  => mi  / 0.621371;
 
 // ─── COORDINATE HELPERS ───────────────────────────────────────────────────────
-function pointAtDistanceMi(lat, lng, distanceMi, direction) {
+/** Point at exactly oneWayMiles in direction (for path-based loop search). */
+function pointInDirection(lat, lng, oneWayMiles, direction) {
   const milesPerDegLat = 69;
   const milesPerDegLng = 69 * Math.cos((lat * Math.PI) / 180);
-  const half = distanceMi / 2;
   switch (direction) {
-    case "N": return { lat: lat + half / milesPerDegLat, lng };
-    case "S": return { lat: lat - half / milesPerDegLat, lng };
-    case "E": return { lat, lng: lng + half / milesPerDegLng };
-    case "W": return { lat, lng: lng - half / milesPerDegLng };
+    case "N": return { lat: lat + oneWayMiles / milesPerDegLat, lng };
+    case "S": return { lat: lat - oneWayMiles / milesPerDegLat, lng };
+    case "E": return { lat, lng: lng + oneWayMiles / milesPerDegLng };
+    case "W": return { lat, lng: lng - oneWayMiles / milesPerDegLng };
     default: return { lat, lng };
   }
+}
+
+function pointAtDistanceMi(lat, lng, distanceMi, direction) {
+  const half = distanceMi / 2;
+  return pointInDirection(lat, lng, half, direction);
 }
 
 // ─── HAVERSINE DISTANCE ──────────────────────────────────────────────────────
@@ -287,13 +292,16 @@ export default function App() {
 }
 
 // ─── MAP COMPONENT ────────────────────────────────────────────────────────────
-function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentLocation = null }) {
+function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentLocation = null, outAndBack = false, loopTargetMi = 3, loopDirection = "N" }) {
   const { styles } = useTheme();
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const directionsRendererRef = useRef(null);
+  const polylineRef = useRef(null);
   const currentMarkerRef = useRef(null);
   const [devicePosition, setDevicePosition] = useState(null);
+  const [loopDirectionsResult, setLoopDirectionsResult] = useState(null);
+  const loopSearchCancelRef = useRef(false);
 
   useEffect(() => {
     if (!mapsReady || !mapRef.current) return;
@@ -350,8 +358,77 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
     };
   }, [mapsReady, positionToShow?.lat, positionToShow?.lng]);
 
+  // Out-and-back loop: find turnaround so walking path (trails) ≈ loopTargetMi, then show directions
   useEffect(() => {
-    if (!mapsReady || !mapInstanceRef.current || !startLocation || !endLocation) return;
+    if (!mapsReady || !outAndBack || typeof startLocation !== "object" || startLocation?.lat == null) {
+      setLoopDirectionsResult(null);
+      return;
+    }
+    const targetMi = Math.max(0.2, Math.min(26, parseFloat(loopTargetMi) || 3));
+    const start = { lat: startLocation.lat, lng: startLocation.lng };
+    loopSearchCancelRef.current = false;
+
+    (async () => {
+      let low = 0.05;
+      let high = Math.min(targetMi, targetMi * 0.6);
+      let bestResult = null;
+      let bestDiff = Infinity;
+
+      for (let iter = 0; iter < 12; iter++) {
+        if (loopSearchCancelRef.current) return;
+        const outMi = (low + high) / 2;
+        const waypoint = pointInDirection(start.lat, start.lng, outMi, loopDirection);
+        try {
+          const maps = window.google.maps;
+          const svc = new maps.DirectionsService();
+          const result = await new Promise((resolve, reject) => {
+            svc.route(
+              {
+                origin: start,
+                destination: start,
+                waypoints: [{ location: waypoint, stopover: true }],
+                travelMode: maps.TravelMode.WALKING,
+              },
+              (res, status) => {
+                if (status === "OK") resolve(res);
+                else reject(new Error(status));
+              }
+            );
+          });
+          if (loopSearchCancelRef.current) return;
+          const totalMeters = result.routes[0].legs.reduce((sum, leg) => sum + (leg.distance?.value ?? 0), 0);
+          const totalMi = totalMeters / 1609.34;
+          const diff = Math.abs(totalMi - targetMi);
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            bestResult = result;
+          }
+          if (diff < 0.08) break;
+          if (totalMi < targetMi) low = outMi;
+          else high = outMi;
+        } catch {
+          high = outMi;
+        }
+      }
+      if (!loopSearchCancelRef.current && bestResult) setLoopDirectionsResult(bestResult);
+    })();
+
+    return () => {
+      loopSearchCancelRef.current = true;
+    };
+  }, [mapsReady, outAndBack, startLocation?.lat, startLocation?.lng, loopTargetMi, loopDirection]);
+
+  useEffect(() => {
+    if (!mapInstanceRef.current || !directionsRendererRef.current) return;
+    if (outAndBack && loopDirectionsResult) {
+      directionsRendererRef.current.setDirections(loopDirectionsResult);
+    } else if (outAndBack) {
+      directionsRendererRef.current.setDirections({ routes: [] });
+    }
+  }, [outAndBack, loopDirectionsResult]);
+
+  useEffect(() => {
+    if (!mapsReady || !mapInstanceRef.current || !startLocation || !endLocation || outAndBack) return;
     const origin = typeof startLocation === "object" && startLocation?.lat != null ? startLocation : startLocation;
     const destination = typeof endLocation === "object" && endLocation?.lat != null ? endLocation : endLocation;
     const maps = window.google.maps;
@@ -363,7 +440,7 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
     }, (result, status) => {
       if (status === "OK") directionsRendererRef.current.setDirections(result);
     });
-  }, [mapsReady, startLocation, endLocation]);
+  }, [mapsReady, startLocation, endLocation, outAndBack]);
 
   if (!mapsReady) return (
     <div style={{ ...styles.mapPlaceholder, height }}>
@@ -492,7 +569,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
             </div>
           </div>
         )}
-        <LiveMap startLocation={originForMap} endLocation={destForMap} mapsReady={mapsReady} currentLocation={currentLocation} />
+        <LiveMap startLocation={originForMap} endLocation={destForMap} mapsReady={mapsReady} currentLocation={currentLocation} outAndBack={bothCurrent} loopTargetMi={customDistanceMi} loopDirection={customDirection} />
       </div>
       <div style={styles.filterRow}>
         {["all", "scenic", "fast"].map(f => (
@@ -544,7 +621,7 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
       <h2 style={styles.tabTitle}>{selectedRoute ? selectedRoute.name : bothCurrent ? "Personalized Run" : "Custom Run"}</h2>
       {(startLocation || selectedRoute) && (
         <div style={{ marginBottom: 16 }}>
-          <LiveMap startLocation={runOrigin} endLocation={runDest} mapsReady={mapsReady} height={180} currentLocation={currentLocation} />
+          <LiveMap startLocation={runOrigin} endLocation={runDest} mapsReady={mapsReady} height={180} currentLocation={currentLocation} outAndBack={bothCurrent} loopTargetMi={customDistanceMi} loopDirection={customDirection} />
         </div>
       )}
       <div style={styles.timerCard}>

@@ -14,6 +14,20 @@ function useTheme() {
 const lbsToKg = (lbs) => lbs * 0.453592;
 const miToKm  = (mi)  => mi  / 0.621371;
 
+// ─── COORDINATE HELPERS ───────────────────────────────────────────────────────
+function pointAtDistanceMi(lat, lng, distanceMi, direction) {
+  const milesPerDegLat = 69;
+  const milesPerDegLng = 69 * Math.cos((lat * Math.PI) / 180);
+  const half = distanceMi / 2;
+  switch (direction) {
+    case "N": return { lat: lat + half / milesPerDegLat, lng };
+    case "S": return { lat: lat - half / milesPerDegLat, lng };
+    case "E": return { lat, lng: lng + half / milesPerDegLng };
+    case "W": return { lat, lng: lng - half / milesPerDegLng };
+    default: return { lat, lng };
+  }
+}
+
 // ─── HAVERSINE DISTANCE ──────────────────────────────────────────────────────
 function haversineMi(lat1, lon1, lat2, lon2) {
   const R = 3958.8; // Earth radius in miles
@@ -85,6 +99,8 @@ export default function App() {
   const [routeFilter, setRouteFilter] = useState("all");
   const [startLocation, setStartLocation] = useState("");
   const [endLocation, setEndLocation] = useState("");
+  const [customDistanceMi, setCustomDistanceMi] = useState("3");
+  const [customDirection, setCustomDirection] = useState("N");
   const [pace, setPace] = useState("9.0"); // min/mile
   const [runActive, setRunActive] = useState(false);
   const [runElapsed, setRunElapsed] = useState(0);
@@ -95,6 +111,7 @@ export default function App() {
   const timerRef = useRef(null);
   const gpsWatchRef = useRef(null);
   const gpsPathRef = useRef([]);
+  const liveDistanceRef = useRef(0);
 
   useEffect(() => {
     localStorage.setItem("madDashDark", JSON.stringify(darkMode));
@@ -128,6 +145,7 @@ export default function App() {
   const startRun = () => {
     setRunElapsed(0);
     setLiveDistanceMi(0);
+    liveDistanceRef.current = 0;
     gpsPathRef.current = [];
     setRunActive(true);
     if (navigator.geolocation) {
@@ -139,7 +157,9 @@ export default function App() {
           if (path.length > 0) {
             const last = path[path.length - 1];
             const added = haversineMi(last.lat, last.lng, latitude, longitude);
-            setLiveDistanceMi(d => parseFloat((d + added).toFixed(3)));
+            const newTotal = parseFloat((liveDistanceRef.current + added).toFixed(3));
+            liveDistanceRef.current = newTotal;
+            setLiveDistanceMi(newTotal);
           }
           gpsPathRef.current = [...path, { lat: latitude, lng: longitude }];
         },
@@ -156,14 +176,17 @@ export default function App() {
       gpsWatchRef.current = null;
     }
     const durationMin = runElapsed / 60;
+    const bothCurrent = typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null;
+    const customDist = parseFloat(customDistanceMi) || 3;
     const distanceMi = liveDistanceMi > 0.05
       ? liveDistanceMi
-      : selectedRoute ? selectedRoute.distanceMi : durationMin / parseFloat(pace || 9.0);
+      : selectedRoute ? selectedRoute.distanceMi : bothCurrent ? customDist : durationMin / parseFloat(pace || 9.0);
     const cals = calcCalories({ weightLbs: profile.weight, durationMin, distanceMi });
+    const routeName = selectedRoute ? selectedRoute.name : bothCurrent ? `Personalized Run (${customDist} mi)` : "Custom Run";
     setRunHistory(h => [{
       id: Date.now(),
       date: new Date().toLocaleDateString(),
-      route: selectedRoute ? selectedRoute.name : "Custom Run",
+      route: routeName,
       durationMin: Math.round(durationMin),
       distanceMi: parseFloat(distanceMi.toFixed(2)),
       calories: cals,
@@ -185,10 +208,12 @@ export default function App() {
     ? ((runElapsed / 60) / liveDistanceMi).toFixed(1)
     : pace;
 
+  const bothCurrentForPreview = typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null;
+  const effectiveDistForPreview = selectedRoute ? selectedRoute.distanceMi : bothCurrentForPreview ? (parseFloat(customDistanceMi) || 3) : 30 / parseFloat(pace || 9.0);
   const previewCals = calcCalories({
     weightLbs: profile.weight,
-    durationMin: selectedRoute ? selectedRoute.distanceMi * parseFloat(pace || 9.0) : 30,
-    distanceMi: selectedRoute ? selectedRoute.distanceMi : 30 / parseFloat(pace || 9.0),
+    durationMin: effectiveDistForPreview * parseFloat(pace || 9.0),
+    distanceMi: effectiveDistForPreview,
   });
 
   const filtered = routeFilter === "all" ? PRESET_ROUTES : PRESET_ROUTES.filter(r => r.type === routeFilter);
@@ -224,6 +249,8 @@ export default function App() {
             endLocation={endLocation} setEndLocation={setEndLocation}
             mapsReady={mapsReady} onGoToRun={() => setTab("run")}
             currentLocation={currentLocation}
+            customDistanceMi={customDistanceMi} setCustomDistanceMi={setCustomDistanceMi}
+            customDirection={customDirection} setCustomDirection={setCustomDirection}
           />
         )}
         {tab === "run" && (
@@ -235,6 +262,7 @@ export default function App() {
             startRun={startRun} stopRun={stopRun} fmtTime={fmtTime}
             mapsReady={mapsReady} startLocation={startLocation} endLocation={endLocation}
             currentLocation={currentLocation}
+            customDistanceMi={customDistanceMi} customDirection={customDirection}
           />
         )}
         {tab === "stats" && <StatsTab history={runHistory} />}
@@ -325,11 +353,12 @@ function LiveMap({ startLocation, endLocation, mapsReady, height = 220, currentL
   useEffect(() => {
     if (!mapsReady || !mapInstanceRef.current || !startLocation || !endLocation) return;
     const origin = typeof startLocation === "object" && startLocation?.lat != null ? startLocation : startLocation;
+    const destination = typeof endLocation === "object" && endLocation?.lat != null ? endLocation : endLocation;
     const maps = window.google.maps;
     const svc = new maps.DirectionsService();
     svc.route({
       origin,
-      destination: endLocation,
+      destination,
       travelMode: maps.TravelMode.WALKING,
     }, (result, status) => {
       if (status === "OK") directionsRendererRef.current.setDirections(result);
@@ -382,8 +411,14 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
 }
 
 // ─── ROUTES TAB ───────────────────────────────────────────────────────────────
-function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocation, setStartLocation, endLocation, setEndLocation, mapsReady, onGoToRun, currentLocation }) {
+function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocation, setStartLocation, endLocation, setEndLocation, mapsReady, onGoToRun, currentLocation, customDistanceMi, setCustomDistanceMi, customDirection, setCustomDirection }) {
   const { styles } = useTheme();
+  const bothCurrent = typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null && endLocation?.lat != null;
+  const originForMap = startLocation;
+  const destForMap = bothCurrent && currentLocation
+    ? pointAtDistanceMi(currentLocation.lat, currentLocation.lng, parseFloat(customDistanceMi) || 3, customDirection)
+    : endLocation;
+
   return (
     <div style={styles.tabContent}>
       <h2 style={styles.tabTitle}>Choose Your Route</h2>
@@ -406,8 +441,58 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
           </button>
         </div>
         <div style={styles.locationDivider}><div style={styles.routeLine} /><span style={styles.arrowDown}>↓</span><div style={styles.routeLine} /></div>
-        <PlacesInput value={endLocation} onChange={setEndLocation} placeholder="End location" mapsReady={mapsReady} />
-        <LiveMap startLocation={startLocation} endLocation={endLocation} mapsReady={mapsReady} currentLocation={currentLocation} />
+        <div style={{ marginBottom: 10 }}>
+          <PlacesInput
+            value={typeof endLocation === "object" ? "Current position" : (endLocation || "")}
+            onChange={(v) => setEndLocation(v)}
+            placeholder="End location"
+            mapsReady={mapsReady}
+          />
+          <button
+            type="button"
+            style={{ ...styles.useCurrentBtn, opacity: currentLocation ? 1 : 0.5, cursor: currentLocation ? "pointer" : "not-allowed" }}
+            onClick={() => currentLocation && setEndLocation(currentLocation)}
+            disabled={!currentLocation}
+          >
+            📍 Use current position
+          </button>
+        </div>
+        {bothCurrent && (
+          <div style={styles.customRouteCard}>
+            <div style={styles.cardLabel}>📏 Personalized Route (out &amp; back)</div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={styles.inputLabel}>Distance (miles)</label>
+              <input
+                style={styles.input}
+                type="number"
+                min="0.5"
+                max="26"
+                step="0.5"
+                value={customDistanceMi}
+                onChange={(e) => setCustomDistanceMi(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={styles.inputLabel}>Direction (turnaround point)</label>
+              <div style={styles.directionRow}>
+                {["N", "S", "E", "W"].map((dir) => (
+                  <button
+                    key={dir}
+                    type="button"
+                    style={{ ...styles.directionBtn, ...(customDirection === dir ? styles.directionBtnActive : {}) }}
+                    onClick={() => setCustomDirection(dir)}
+                  >
+                    {dir === "N" ? "⬆ North" : dir === "S" ? "⬇ South" : dir === "E" ? "➡ East" : "⬅ West"}
+                  </button>
+                ))}
+              </div>
+              <div style={styles.mutedText}>
+                Run {(parseFloat(customDistanceMi) || 3) / 2} mi {customDirection === "N" ? "north" : customDirection === "S" ? "south" : customDirection === "E" ? "east" : "west"}, then return.
+              </div>
+            </div>
+          </div>
+        )}
+        <LiveMap startLocation={originForMap} endLocation={destForMap} mapsReady={mapsReady} currentLocation={currentLocation} />
       </div>
       <div style={styles.filterRow}>
         {["all", "scenic", "fast"].map(f => (
@@ -444,16 +529,22 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
 }
 
 // ─── RUN TAB ──────────────────────────────────────────────────────────────────
-function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runElapsed, liveDistanceMi, livePace, startRun, stopRun, fmtTime, mapsReady, startLocation, endLocation, currentLocation }) {
+function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runElapsed, liveDistanceMi, livePace, startRun, stopRun, fmtTime, mapsReady, startLocation, endLocation, currentLocation, customDistanceMi, customDirection }) {
   const { styles } = useTheme();
   const liveCals = calcCalories({ weightLbs: profile.weight, durationMin: runElapsed / 60, distanceMi: Math.max(liveDistanceMi, 0.01) });
+  const bothCurrent = typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null && endLocation?.lat != null;
+  const runOrigin = startLocation || selectedRoute?.start;
+  const runDest = bothCurrent && currentLocation
+    ? pointAtDistanceMi(currentLocation.lat, currentLocation.lng, parseFloat(customDistanceMi) || 3, customDirection)
+    : (endLocation || selectedRoute?.end);
+  const effectiveDistance = selectedRoute ? selectedRoute.distanceMi : (bothCurrent ? parseFloat(customDistanceMi) || 3 : null);
 
   return (
     <div style={styles.tabContent}>
-      <h2 style={styles.tabTitle}>{selectedRoute ? selectedRoute.name : "Custom Run"}</h2>
+      <h2 style={styles.tabTitle}>{selectedRoute ? selectedRoute.name : bothCurrent ? "Personalized Run" : "Custom Run"}</h2>
       {(startLocation || selectedRoute) && (
         <div style={{ marginBottom: 16 }}>
-          <LiveMap startLocation={startLocation || selectedRoute?.start} endLocation={endLocation || selectedRoute?.end} mapsReady={mapsReady} height={180} currentLocation={currentLocation} />
+          <LiveMap startLocation={runOrigin} endLocation={runDest} mapsReady={mapsReady} height={180} currentLocation={currentLocation} />
         </div>
       )}
       <div style={styles.timerCard}>
@@ -486,10 +577,10 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
               <input style={{ ...styles.input, opacity: 0.6 }} value={profile.weight} readOnly />
             </div>
           </div>
-          {selectedRoute && (
+          {(selectedRoute || effectiveDistance) && (
             <div style={styles.routeSummary}>
-              <span>📏 {selectedRoute.distanceMi} mi</span>
-              <span>⏱ ~{Math.round(selectedRoute.distanceMi * parseFloat(pace || 9.0))} min</span>
+              <span>📏 {effectiveDistance} mi</span>
+              <span>⏱ ~{Math.round(effectiveDistance * parseFloat(pace || 9.0))} min</span>
             </div>
           )}
         </div>
@@ -630,9 +721,14 @@ function getStyles(C) {
     navDot: { position: "absolute", bottom: 0, width: 4, height: 4, borderRadius: "50%", background: "#fff" },
     card: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 16 },
     cardLabel: { fontSize: 9, letterSpacing: 3, color: C.muted, textTransform: "uppercase", marginBottom: 12 },
+    mutedText: { fontSize: 11, color: C.muted, marginTop: 8 },
     input: { width: "100%", background: C.inputBg, border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 14, padding: "10px 12px", boxSizing: "border-box", fontFamily: "inherit", outline: "none", marginBottom: 10 },
     inputIcon: { position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.muted, pointerEvents: "none", display: "flex", alignItems: "center" },
     useCurrentBtn: { marginTop: 6, padding: "6px 10px", fontSize: 12, background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, color: C.muted, cursor: "pointer", opacity: 0.9 },
+    customRouteCard: { background: C.accentLight, border: `1px solid ${C.accent}33`, borderRadius: 12, padding: 14, marginBottom: 16 },
+    directionRow: { display: "flex", gap: 8, flexWrap: "wrap" },
+    directionBtn: { flex: 1, minWidth: 70, padding: "8px 10px", fontSize: 12, background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.muted, cursor: "pointer", letterSpacing: 1 },
+    directionBtnActive: { background: C.accent, color: "#fff", borderColor: C.accent, fontWeight: 700 },
     inputRow: { display: "flex", gap: 10 },
     inputGroup: { flex: 1, display: "flex", flexDirection: "column" },
     inputLabel: { fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6, textTransform: "uppercase" },

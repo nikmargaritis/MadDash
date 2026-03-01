@@ -125,7 +125,7 @@ export default function App() {
   const [endLocation, setEndLocation] = useState("");
   const [customDistanceMi, setCustomDistanceMi] = useState("3");
   const [customDirection, setCustomDirection] = useState("N");
-  const [pace, setPace] = useState("9.0"); // min/mile
+  const [pace, setPace] = useState("0.0"); // min/mile
   const [runActive, setRunActive] = useState(false);
   const [runPaused, setRunPaused] = useState(false);
   const [runElapsedMs, setRunElapsedMs] = useState(0);

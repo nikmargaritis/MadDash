@@ -1,120 +1,74 @@
 # MadDash – Health & Lifestyle Run Tracker
 
-A React app for tracking runs with route selection, calorie estimation, and Google Maps integration.
+A React app for tracking runs with route selection, calorie estimation, and Google Maps integration. Developed for runners around UW Madison.
 
 ---
 
-## Step-by-Step Setup
+## 🚀 Quick Start
 
-### Step 1 – Install Node.js
+### 1. Install Node.js
 Download from https://nodejs.org (LTS version recommended, v18+).
-Verify: `node -v` and `npm -v`
+Verify installation: `node -v` and `npm -v`
 
-### Step 2 – Install Dependencies
-Open a terminal in the `maddash-app` folder and run:
+### 2. Install Dependencies
+Open a terminal in the project folder and run:
 ```bash
 npm install
 ```
 
-### Step 3 – Start the Dev Server
+### 3. Google Maps API Setup (Required for Maps)
+To enable the map, route drawing, and location autocomplete features:
+1. Create a `.env.local` file in the root directory.
+2. Add your Google Maps API Key:
+```bash
+VITE_GOOGLE_MAPS_API_KEY=your_actual_key_here
+```
+*Note: Ensure your API key has the **Maps JavaScript API**, **Directions API**, and **Places API** enabled in Google Cloud Console.*
+
+### 4. Start the Dev Server
 ```bash
 npm run dev
 ```
-Open http://localhost:5173 in your browser. You should see the MadDash app!
-
----
-
-## Google Maps API Setup
-
-### Step 4 – Get a Google Maps API Key
-1. Go to https://console.cloud.google.com
-2. Create a new project (or select existing)
-3. Go to **APIs & Services → Library**
-4. Enable these APIs:
-   - **Maps JavaScript API**
-   - **Directions API**
-   - **Places API** (for address autocomplete)
-5. Go to **APIs & Services → Credentials → Create Credentials → API Key**
-6. Copy your new API key
-
-### Step 5 – Add the API Key to the App
-In `src/App.jsx`, find the Profile tab section and replace the placeholder input with your actual key, or create a `.env` file:
-
-```bash
-# .env file (in project root)
-VITE_GOOGLE_MAPS_KEY=your_actual_key_here
-```
-
-Then in code, access it as: `import.meta.env.VITE_GOOGLE_MAPS_KEY`
-
-### Step 6 – Enable Live Maps (Code Update)
-In `src/App.jsx`, replace the `mapPlaceholder` div with real Google Maps:
-
-```jsx
-import { Loader } from '@googlemaps/js-api-loader';
-
-// In your component:
-useEffect(() => {
-  const loader = new Loader({
-    apiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
-    libraries: ['places', 'directions']
-  });
-  loader.load().then(() => {
-    const map = new google.maps.Map(document.getElementById('map'), {
-      center: { lat: 40.7128, lng: -74.0060 },
-      zoom: 13,
-    });
-    // Add DirectionsService for route drawing
-    const directionsService = new google.maps.DirectionsService();
-    const directionsRenderer = new google.maps.DirectionsRenderer();
-    directionsRenderer.setMap(map);
-  });
-}, []);
-```
+Open http://localhost:5173 in your browser to see MadDash!
 
 ---
 
 ## 📱 Features
 
-| Feature | Status |
-|--------|--------|
-| Route selection (scenic / fast) | ✅ Working |
-| Start / end location inputs | ✅ Working |
-| Google Maps embed | 🔑 Needs API key |
-| Live address autocomplete | 🔑 Needs Places API |
-| Turn-by-turn directions | 🔑 Needs Directions API |
-| Run timer (start/stop) | ✅ Working |
-| Calorie estimator (MET-based) | ✅ Working |
-| Run history & stats | ✅ Working |
-| User profile (weight in lbs, age) | ✅ Working |
-| GPS live tracking | 🔧 See below |
+| Feature | Description | Status |
+|--------|-------------|--------|
+| **Route Selection** | Choose from preset scenic/fast routes around Madison | ✅ Active |
+| **Custom Routing** | Input custom start/end points using Google Places autocomplete | ✅ Active |
+| **Personalized Loops** | Generate out-and-back routes of a specific distance & direction | ✅ Active |
+| **Live Map Integration** | View your route visually using Google Maps SDK | ✅ Active |
+| **Run Timer** | Start, pause, resume, and end runs with a precision timer | ✅ Active |
+| **GPS Live Tracking** | Real-time distance tracking via browser Geolocation API | ✅ Active |
+| **Calorie Estimator** | Dynamic MET-based calorie calculation using your pace and weight | ✅ Active |
+| **Run History** | Save and rename completed runs, track total mileage and calories | ✅ Active |
+| **Dark Mode** | Seamless light/dark theme toggling saved to local storage | ✅ Active |
 
 ---
 
-## GPS Live Tracking (Strava-style)
+## 🧮 How It Works
 
-To track the user while running:
+### GPS Live Tracking
+When a run is started, the app uses `navigator.geolocation.watchPosition` to track the user's movement. It calculates the distance between GPS coordinates using the **Haversine formula** and accumulates the total distance traveled.
 
-```js
-// Add to RunTab when run starts:
-const watchId = navigator.geolocation.watchPosition(
-  (pos) => {
-    const { latitude, longitude } = pos.coords;
-    // append to route polyline on map
-    // calculate real distance from coordinates
-  },
-  (err) => console.error(err),
-  { enableHighAccuracy: true, maximumAge: 0 }
-);
+### Calorie Formula
+MadDash uses MET values (Metabolic Equivalent of Task) based on the runner's pace:
 
-// When run stops:
-navigator.geolocation.clearWatch(watchId);
+```
+Pace (min/km) = Duration(min) / Distance(km)
+MET = 90 / Pace    (Clamped between 6 and 14)
+Calories = MET × weight_kg × duration_hours
 ```
 
-For full Strava-like tracking, consider:
-- **Haversine formula** for distance between GPS points
-- Storing coordinates array in state and drawing a polyline on the map
-- Using the **Web Geolocation API** (works in browser, needs HTTPS in production)
+---
+
+## 🛠 Tech Stack
+- **Framework:** React + Vite
+- **Styling:** Vanilla CSS-in-JS (Inline styles)
+- **Maps:** Google Maps JavaScript API (Geocoding, Directions, Places)
 
 ---
 
@@ -122,16 +76,4 @@ For full Strava-like tracking, consider:
 ```bash
 npm run build
 ```
-Output goes to `/dist`. Deploy to Vercel, Netlify, or any static host.
-
----
-
-## Calorie Formula
-MadDash uses MET values (Metabolic Equivalent of Task):
-
-```
-MET ≈ 90 / pace_in_min_per_mile   (clamped 6–14)
-Calories = MET × weight_lbs × 0.453592 × duration_hours
-```
-
-Example: 155 lb runner, 9:00/mi pace, 30 min ≈ 320 cal
+Builds the app for production to the `/dist` folder. It correctly bundles React in production mode and optimizes the build for the best performance.

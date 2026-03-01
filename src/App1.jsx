@@ -46,6 +46,16 @@ function haversineMi(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+
+// ─── NEARBY CHECK ─────────────────────────────────────────────────────────────
+// Returns true if both locations are coord objects and within 0.5 miles of each other
+// (i.e., suitable for personalized out-and-back routing)
+function areNearby(a, b) {
+  if (typeof a !== "object" || a?.lat == null) return false;
+  if (typeof b !== "object" || b?.lat == null) return false;
+  return haversineMi(a.lat, a.lng, b.lat, b.lng) < 0.5;
+}
+
 // ─── CALORIE CALC ────────────────────────────────────────────────────────────
 function calcCalories({ weightLbs, durationMin, distanceMi }) {
   const weightKg = lbsToKg(weightLbs);
@@ -80,6 +90,7 @@ const Icons = {
   ChevronRight: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><polyline points="9,18 15,12 9,6"/></svg>),
   Play: () => (<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><polygon points="5,3 19,12 5,21"/></svg>),
   Stop: () => (<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>),
+  Pause: () => (<svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>),
   Location: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 00-8 8c0 5.25 8 13 8 13s8-7.75 8-13a8 8 0 00-8-8z"/></svg>),
   Moon: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>),
   Sun: () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>),
@@ -87,10 +98,18 @@ const Icons = {
 
 // ─── PRESET MADISON ROUTES ───────────────────────────────────────────────────
 const PRESET_ROUTES = [
-  { id: 1, name: "Lakeshore Path", type: "scenic", distanceMi: 3.2, elevationFt: 66, description: "Beautiful run along Lake Mendota past Memorial Union.", start: "Memorial Union, Madison, WI", end: "Picnic Point, Madison, WI" },
-  { id: 2, name: "Capitol Loop", type: "fast", distanceMi: 2.4, elevationFt: 49, description: "Fast flat loop around the Wisconsin State Capitol.", start: "Wisconsin State Capitol, Madison, WI", end: "Wisconsin State Capitol, Madison, WI" },
-  { id: 3, name: "Monona Terrace Loop", type: "scenic", distanceMi: 4.0, elevationFt: 98, description: "Scenic route along Lake Monona with city views.", start: "Monona Terrace, Madison, WI", end: "Olbrich Park, Madison, WI" },
-  { id: 4, name: "UW Campus Sprint", type: "fast", distanceMi: 1.7, elevationFt: 33, description: "Quick run through the UW Madison campus.", start: "Bascom Hall, Madison, WI", end: "Camp Randall Stadium, Madison, WI" },
+  { id: 1, name: "Lakeshore Path", type: "scenic", distanceMi: 3.2, elevationFt: 66, description: "Beautiful run along Lake Mendota past Memorial Union.",
+    start: { lat: 43.0766, lng: -89.4016, label: "Memorial Union, Madison, WI" },
+    end:   { lat: 43.0882, lng: -89.4251, label: "Picnic Point, Madison, WI" } },
+  { id: 2, name: "Capitol Loop", type: "fast", distanceMi: 2.4, elevationFt: 49, description: "Fast flat loop around the Wisconsin State Capitol.",
+    start: { lat: 43.0748, lng: -89.3838, label: "Wisconsin State Capitol, Madison, WI" },
+    end:   { lat: 43.0748, lng: -89.3838, label: "Wisconsin State Capitol, Madison, WI" } },
+  { id: 3, name: "Monona Terrace Loop", type: "scenic", distanceMi: 4.0, elevationFt: 98, description: "Scenic route along Lake Monona with city views.",
+    start: { lat: 43.0713, lng: -89.3803, label: "Monona Terrace, Madison, WI" },
+    end:   { lat: 43.0753, lng: -89.3334, label: "Olbrich Park, Madison, WI" } },
+  { id: 4, name: "UW Campus Sprint", type: "fast", distanceMi: 1.7, elevationFt: 33, description: "Quick run through the UW Madison campus.",
+    start: { lat: 43.0757, lng: -89.4056, label: "Bascom Hall, Madison, WI" },
+    end:   { lat: 43.0696, lng: -89.4124, label: "Camp Randall Stadium, Madison, WI" } },
 ];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -106,9 +125,10 @@ export default function App() {
   const [endLocation, setEndLocation] = useState("");
   const [customDistanceMi, setCustomDistanceMi] = useState("3");
   const [customDirection, setCustomDirection] = useState("N");
-  const [pace, setPace] = useState("9.0"); // min/mile
+  const [pace, setPace] = useState("0.0"); // min/mile
   const [runActive, setRunActive] = useState(false);
-  const [runElapsed, setRunElapsed] = useState(0);
+  const [runPaused, setRunPaused] = useState(false);
+  const [runElapsedMs, setRunElapsedMs] = useState(0);
   const [runHistory, setRunHistory] = useState([]);
   const [liveDistanceMi, setLiveDistanceMi] = useState(0);
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -139,20 +159,52 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (runActive) {
-      timerRef.current = setInterval(() => setRunElapsed(s => s + 1), 1000);
+    if (runActive && !runPaused) {
+      timerRef.current = setInterval(() => setRunElapsedMs(ms => ms + 10), 10);
     } else {
       clearInterval(timerRef.current);
     }
     return () => clearInterval(timerRef.current);
-  }, [runActive]);
+  }, [runActive, runPaused]);
 
   const startRun = () => {
-    setRunElapsed(0);
+    setRunElapsedMs(0);
     setLiveDistanceMi(0);
     liveDistanceRef.current = 0;
     gpsPathRef.current = [];
+    setRunPaused(false);
     setRunActive(true);
+    if (navigator.geolocation) {
+      gpsWatchRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setCurrentLocation({ lat: latitude, lng: longitude });
+          const path = gpsPathRef.current;
+          if (path.length > 0) {
+            const last = path[path.length - 1];
+            const added = haversineMi(last.lat, last.lng, latitude, longitude);
+            const newTotal = parseFloat((liveDistanceRef.current + added).toFixed(3));
+            liveDistanceRef.current = newTotal;
+            setLiveDistanceMi(newTotal);
+          }
+          gpsPathRef.current = [...path, { lat: latitude, lng: longitude }];
+        },
+        (err) => console.warn("GPS error:", err),
+        { enableHighAccuracy: true, maximumAge: 0 }
+      );
+    }
+  };
+
+  const pauseRun = () => {
+    setRunPaused(true);
+    if (gpsWatchRef.current) {
+      navigator.geolocation.clearWatch(gpsWatchRef.current);
+      gpsWatchRef.current = null;
+    }
+  };
+
+  const resumeRun = () => {
+    setRunPaused(false);
     if (navigator.geolocation) {
       gpsWatchRef.current = navigator.geolocation.watchPosition(
         (pos) => {
@@ -176,18 +228,19 @@ export default function App() {
 
   const stopRun = () => {
     setRunActive(false);
+    setRunPaused(false);
     if (gpsWatchRef.current) {
       navigator.geolocation.clearWatch(gpsWatchRef.current);
       gpsWatchRef.current = null;
     }
-    const durationMin = runElapsed / 60;
-    const bothCurrent = !selectedRoute && typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null;
+    const durationMin = runElapsedMs / 60000;
+    const bothCurrent = typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null;
     const customDist = parseFloat(customDistanceMi) || 3;
     const distanceMi = liveDistanceMi > 0.05
       ? liveDistanceMi
       : selectedRoute ? selectedRoute.distanceMi : bothCurrent ? customDist : durationMin / parseFloat(pace || 9.0);
     const cals = calcCalories({ weightLbs: profile.weight, durationMin, distanceMi });
-    const routeName = selectedRoute ? selectedRoute.name : bothCurrent ? `Personalized Run (${customDist} mi)` : "Custom Run";
+    const routeName = selectedRoute ? selectedRoute.name : bothCurrent ? `Personalized Run (${customDist} mi)` : typeof startLocation === "object" && startLocation?.label ? startLocation.label.split(",")[0] + " → " + (typeof endLocation === "object" && endLocation?.label ? endLocation.label.split(",")[0] : "End") : "Custom Run";
     setRunHistory(h => [{
       id: Date.now(),
       date: new Date().toLocaleDateString(),
@@ -200,20 +253,23 @@ export default function App() {
     setTab("stats");
   };
 
-  const fmtTime = (s) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
+  const fmtTime = (ms) => {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const sec = totalSec % 60;
+    const millis = Math.floor((ms % 1000) / 10); 
+    const msPart = `.${String(millis).padStart(2, "0")}`;
     return h > 0
-      ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-      : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+      ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}${msPart}`
+      : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}${msPart}`;
   };
 
-  const livePace = runActive && liveDistanceMi > 0.05 && runElapsed > 0
-    ? ((runElapsed / 60) / liveDistanceMi).toFixed(1)
+  const livePace = runActive && !runPaused && liveDistanceMi > 0.05 && runElapsedMs > 0
+    ? ((runElapsedMs / 60000) / liveDistanceMi).toFixed(1)
     : pace;
 
-  const bothCurrentForPreview = typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null;
+  const bothCurrentForPreview = areNearby(startLocation, endLocation);
   const effectiveDistForPreview = selectedRoute ? selectedRoute.distanceMi : bothCurrentForPreview ? (parseFloat(customDistanceMi) || 3) : 30 / parseFloat(pace || 9.0);
   const previewCals = calcCalories({
     weightLbs: profile.weight,
@@ -225,8 +281,10 @@ export default function App() {
 
   const selectPreset = (route) => {
     setSelectedRoute(route);
-    setStartLocation(route.start);
+    setStartLocation(route.start);  // already {lat, lng, label}
     setEndLocation(route.end);
+    // Pre-fill the loop distance with this route's known distance
+    setCustomDistanceMi(String(route.distanceMi));
   };
 
   return (
@@ -262,15 +320,17 @@ export default function App() {
           <RunTab
             selectedRoute={selectedRoute} pace={pace} setPace={setPace}
             profile={profile} previewCals={previewCals}
-            runActive={runActive} runElapsed={runElapsed}
+            runActive={runActive} runElapsedMs={runElapsedMs}
+            runPaused={runPaused}
             liveDistanceMi={liveDistanceMi} livePace={livePace}
-            startRun={startRun} stopRun={stopRun} fmtTime={fmtTime}
+            startRun={startRun} stopRun={stopRun} pauseRun={pauseRun} resumeRun={resumeRun}
+            fmtTime={fmtTime}
             mapsReady={mapsReady} startLocation={startLocation} endLocation={endLocation}
             currentLocation={currentLocation}
             customDistanceMi={customDistanceMi} customDirection={customDirection}
           />
         )}
-        {tab === "stats" && <StatsTab history={runHistory} />}
+        {tab === "stats" && <StatsTab history={runHistory} onRenameRun={(id, name) => setRunHistory(h => h.map(r => r.id === id ? { ...r, route: name } : r))} />}
         {tab === "profile" && <ProfileTab profile={profile} setProfile={setProfile} />}
       </main>
       <nav style={styles.nav}>
@@ -502,6 +562,13 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
   const inputRef = useRef(null);
   const acRef = useRef(null);
 
+  // Derive display string from value (string or {lat,lng,label} object)
+  const displayValue = typeof value === "object" && value?.label
+    ? value.label
+    : typeof value === "object" && value?.lat != null
+    ? "Current position"
+    : (value || "");
+
   useEffect(() => {
     if (!mapsReady || !inputRef.current || acRef.current) return;
     const maps = window.google.maps;
@@ -511,7 +578,14 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
     });
     acRef.current.addListener("place_changed", () => {
       const place = acRef.current.getPlace();
-      if (place.formatted_address) onChange(place.formatted_address);
+      if (place.geometry?.location && place.formatted_address) {
+        // Return a rich object with lat/lng AND the address label
+        onChange({
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+          label: place.formatted_address,
+        });
+      }
     });
   }, [mapsReady]);
 
@@ -522,7 +596,7 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
         ref={inputRef}
         style={{ ...styles.input, paddingLeft: 34, marginBottom: 0 }}
         placeholder={placeholder}
-        value={value}
+        value={displayValue}
         onChange={e => onChange(e.target.value)}
       />
     </div>
@@ -532,11 +606,38 @@ function PlacesInput({ value, onChange, placeholder, mapsReady }) {
 // ─── ROUTES TAB ───────────────────────────────────────────────────────────────
 function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocation, setStartLocation, endLocation, setEndLocation, mapsReady, onGoToRun, currentLocation, customDistanceMi, setCustomDistanceMi, customDirection, setCustomDirection }) {
   const { styles } = useTheme();
-  const bothCurrent = !selected && typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null && endLocation?.lat != null;
+  const bothCurrent = areNearby(startLocation, endLocation);
   const originForMap = startLocation;
-  const destForMap = bothCurrent && currentLocation
-    ? pointAtDistanceMi(currentLocation.lat, currentLocation.lng, parseFloat(customDistanceMi) || 3, customDirection)
+  const anchorLoc = bothCurrent ? startLocation : null;
+  const destForMap = bothCurrent && anchorLoc
+    ? pointAtDistanceMi(anchorLoc.lat, anchorLoc.lng, parseFloat(customDistanceMi) || 3, customDirection)
     : endLocation;
+  const [customRouteDistanceMi, setCustomRouteDistanceMi] = useState(null);
+
+  // Fetch walking route distance for custom start/end (point-to-point only)
+  useEffect(() => {
+    if (!mapsReady || bothCurrent || !startLocation || !endLocation) {
+      setCustomRouteDistanceMi(null);
+      return;
+    }
+    const origin = typeof startLocation === "object" && startLocation?.lat != null ? startLocation : startLocation;
+    const destination = typeof endLocation === "object" && endLocation?.lat != null ? endLocation : endLocation;
+    const maps = window.google?.maps;
+    if (!maps) return;
+    const svc = new maps.DirectionsService();
+    svc.route({
+      origin,
+      destination,
+      travelMode: maps.TravelMode.WALKING,
+    }, (result, status) => {
+      if (status === "OK") {
+        const meters = result.routes[0].legs.reduce((sum, leg) => sum + (leg.distance?.value ?? 0), 0);
+        setCustomRouteDistanceMi(parseFloat((meters / 1609.34).toFixed(2)));
+      } else {
+        setCustomRouteDistanceMi(null);
+      }
+    });
+  }, [mapsReady, bothCurrent, startLocation, endLocation]);
 
   return (
     <div style={styles.tabContent}>
@@ -545,7 +646,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
         <div style={styles.cardLabel}>📍 Custom Locations</div>
         <div style={{ marginBottom: 10 }}>
           <PlacesInput
-            value={typeof startLocation === "object" ? "Current position" : (startLocation || "")}
+            value={startLocation}
             onChange={(v) => setStartLocation(v)}
             placeholder="Start location"
             mapsReady={mapsReady}
@@ -562,7 +663,7 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
         <div style={styles.locationDivider}><div style={styles.routeLine} /><span style={styles.arrowDown}>↓</span><div style={styles.routeLine} /></div>
         <div style={{ marginBottom: 10 }}>
           <PlacesInput
-            value={typeof endLocation === "object" ? "Current position" : (endLocation || "")}
+            value={endLocation}
             onChange={(v) => setEndLocation(v)}
             placeholder="End location"
             mapsReady={mapsReady}
@@ -618,6 +719,16 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
           </div>
         )}
         <LiveMap startLocation={originForMap} endLocation={destForMap} mapsReady={mapsReady} currentLocation={currentLocation} outAndBack={bothCurrent} loopTargetMi={customDistanceMi} loopDirection={customDirection} />
+        {customRouteDistanceMi != null && (
+          <div style={{ ...styles.routeSummary, marginTop: 12 }}>
+            <span>📏 Route distance: <strong>{customRouteDistanceMi} mi</strong> </span>
+          </div>
+        )}
+        {bothCurrent && (parseFloat(customDistanceMi) || 0) > 0 && (
+          <div style={{ ...styles.routeSummary, marginTop: 12 }}>
+            <span>📏 Route distance: <strong>{parseFloat(customDistanceMi) || 3} mi</strong> (out &amp; back)</span>
+          </div>
+        )}
       </div>
       <div style={styles.filterRow}>
         {["all", "scenic", "fast"].map(f => (
@@ -654,15 +765,18 @@ function RoutesTab({ routes, filter, setFilter, selected, onSelect, startLocatio
 }
 
 // ─── RUN TAB ──────────────────────────────────────────────────────────────────
-function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runElapsed, liveDistanceMi, livePace, startRun, stopRun, fmtTime, mapsReady, startLocation, endLocation, currentLocation, customDistanceMi, customDirection }) {
+function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive, runPaused, runElapsedMs, liveDistanceMi, livePace, startRun, stopRun, pauseRun, resumeRun, fmtTime, mapsReady, startLocation, endLocation, currentLocation, customDistanceMi, customDirection }) {
   const { styles } = useTheme();
-  const liveCals = calcCalories({ weightLbs: profile.weight, durationMin: runElapsed / 60, distanceMi: Math.max(liveDistanceMi, 0.01) });
-  const bothCurrent = !selectedRoute && typeof startLocation === "object" && typeof endLocation === "object" && startLocation?.lat != null && endLocation?.lat != null;
+  const liveCals = calcCalories({ weightLbs: profile.weight, durationMin: runElapsedMs / 60000, distanceMi: Math.max(liveDistanceMi, 0.01) });
+  const bothCurrent = areNearby(startLocation, endLocation);
   const runOrigin = startLocation || selectedRoute?.start;
-  const runDest = bothCurrent && currentLocation
-    ? pointAtDistanceMi(currentLocation.lat, currentLocation.lng, parseFloat(customDistanceMi) || 3, customDirection)
+  const anchorLoc = bothCurrent ? startLocation : null;
+  const runDest = bothCurrent && anchorLoc
+    ? pointAtDistanceMi(anchorLoc.lat, anchorLoc.lng, parseFloat(customDistanceMi) || 3, customDirection)
     : (endLocation || selectedRoute?.end);
   const effectiveDistance = selectedRoute ? selectedRoute.distanceMi : (bothCurrent ? parseFloat(customDistanceMi) || 3 : null);
+  const isRunning = runActive && !runPaused;
+  const isPaused = runActive && runPaused;
 
   return (
     <div style={styles.tabContent}>
@@ -681,8 +795,10 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
         </div>
       )}
       <div style={styles.timerCard}>
-        <div style={styles.timerTime}>{fmtTime(runElapsed)}</div>
-        <div style={styles.timerLabel}>{runActive ? "● RUNNING" : "READY TO RUN"}</div>
+        <div style={styles.timerTime}>{fmtTime(runElapsedMs)}</div>
+        <div style={styles.timerLabel}>
+          {isRunning ? "● RUNNING" : isPaused ? "⏸ PAUSED" : "READY TO RUN"}
+        </div>
         {runActive && (
           <div style={styles.liveStatsRow}>
             <div style={styles.liveStat}><div style={styles.liveStatNum}>{liveDistanceMi.toFixed(2)}</div><div style={styles.liveStatLabel}>miles</div></div>
@@ -692,10 +808,31 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
             <div style={styles.liveStat}><div style={styles.liveStatNum}>{liveCals}</div><div style={styles.liveStatLabel}>cal</div></div>
           </div>
         )}
-        <button style={{ ...styles.bigBtn, ...(runActive ? styles.bigBtnStop : {}) }} onClick={runActive ? stopRun : startRun}>
-          {runActive ? <Icons.Stop /> : <Icons.Play />}
-        </button>
-        {runActive && <div style={styles.gpsNote}>📡 GPS tracking active</div>}
+        <div style={styles.runControls}>
+          {!runActive && (
+            <button style={styles.bigBtn} onClick={startRun}>
+              <Icons.Play />
+            </button>
+          )}
+          {isRunning && (
+            <>
+              <button style={{ ...styles.bigBtn, ...styles.bigBtnPause }} onClick={pauseRun} title="Pause">
+                <Icons.Pause />
+              </button>
+              <button style={styles.endRunBtn} onClick={stopRun}>End run</button>
+            </>
+          )}
+          {isPaused && (
+            <>
+              <button style={styles.bigBtn} onClick={resumeRun} title="Resume">
+                <Icons.Play />
+              </button>
+              <button style={styles.endRunBtn} onClick={stopRun}>End run</button>
+            </>
+          )}
+        </div>
+        {isRunning && <div style={styles.gpsNote}>📡 GPS tracking active</div>}
+        {isPaused && <div style={styles.gpsNote}>Paused — tap Resume to continue</div>}
       </div>
       {!runActive && (
         <div style={styles.card}>
@@ -730,7 +867,7 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
 }
 
 // ─── STATS TAB ────────────────────────────────────────────────────────────────
-function StatsTab({ history }) {
+function StatsTab({ history, onRenameRun }) {
   const { styles } = useTheme();
   const totalCals = history.reduce((a, r) => a + r.calories, 0);
   const totalMi = history.reduce((a, r) => a + r.distanceMi, 0);
@@ -752,7 +889,13 @@ function StatsTab({ history }) {
           {history.map(run => (
             <div key={run.id} style={styles.historyCard}>
               <div style={styles.historyTop}>
-                <span style={styles.historyRoute}>{run.route}</span>
+                <input
+                  type="text"
+                  style={{ ...styles.historyRouteInput, ...styles.historyRoute }}
+                  value={run.route}
+                  onChange={(e) => onRenameRun(run.id, e.target.value)}
+                  placeholder="Run name"
+                />
                 <span style={styles.historyDate}>{run.date}</span>
               </div>
               <div style={styles.historyMeta}>
@@ -899,6 +1042,9 @@ function getStyles(C) {
     liveStatDivider: { width: 1, height: 32, background: C.border },
     bigBtn: { width: 72, height: 72, borderRadius: "50%", background: C.accent, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", transition: "transform 0.1s", boxShadow: `0 0 24px ${C.accent}44` },
     bigBtnStop: { background: C.accentDark, boxShadow: `0 0 24px ${C.accentDark}44` },
+    bigBtnPause: { background: "#b8860b", boxShadow: "0 0 24px rgba(184,134,11,0.4)" },
+    runControls: { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginTop: 8 },
+    endRunBtn: { background: "transparent", color: C.muted, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: "10px 20px", fontSize: 12, cursor: "pointer", fontFamily: "inherit", letterSpacing: 1 },
     gpsNote: { fontSize: 11, color: C.muted, marginTop: 12 },
     routeSummary: { display: "flex", gap: 20, fontSize: 13, color: C.muted, marginTop: 4 },
     calCard: { background: C.calGrad, border: `1.5px solid ${C.accent}33`, borderRadius: 16, padding: 24, textAlign: "center" },
@@ -911,8 +1057,9 @@ function getStyles(C) {
     statLabel: { fontSize: 10, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginTop: 4 },
     emptyState: { textAlign: "center", padding: "40px 20px", color: C.muted },
     historyCard: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, marginBottom: 10 },
-    historyTop: { display: "flex", justifyContent: "space-between", marginBottom: 8 },
+    historyTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 },
     historyRoute: { fontWeight: 700, fontSize: 14 },
+    historyRouteInput: { background: "transparent", border: "none", outline: "none", padding: 0, flex: 1, minWidth: 0, fontFamily: "inherit", color: "inherit" },
     historyDate: { fontSize: 11, color: C.muted },
     historyMeta: { display: "flex", gap: 14, fontSize: 12, color: C.muted, flexWrap: "wrap" },
     gpsBadge: { background: C.accentLight, color: C.accent, fontSize: 10, padding: "1px 7px", borderRadius: 10, fontWeight: 600 },

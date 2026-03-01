@@ -1,6 +1,8 @@
-# MadDash – Health & Lifestyle Run Tracker
+# MadDash – Health & Lifestyle Run Tracker 
 
-![alt text](logo.png) 
+<p align="center">
+  <img src="./public/logo.png" alt="MadDash Logo" width="300" />
+</p>
 
 A React app for tracking runs with route selection, calorie estimation, and Google Maps integration. Developed for runners around UW Madison.
 

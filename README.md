@@ -1,5 +1,7 @@
 # MadDash – Health & Lifestyle Run Tracker
 
+![alt text](logo.png) 
+
 A React app for tracking runs with route selection, calorie estimation, and Google Maps integration. Developed for runners around UW Madison.
 
 ---
@@ -65,7 +67,7 @@ Calories = MET × weight_kg × duration_hours
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 - **Framework:** React + Vite
 - **Styling:** Vanilla CSS-in-JS (Inline styles)
 - **Maps:** Google Maps JavaScript API (Geocoding, Directions, Places)

@@ -330,7 +330,7 @@ export default function App() {
             customDistanceMi={customDistanceMi} customDirection={customDirection}
           />
         )}
-        {tab === "stats" && <StatsTab history={runHistory} />}
+        {tab === "stats" && <StatsTab history={runHistory} onRenameRun={(id, name) => setRunHistory(h => h.map(r => r.id === id ? { ...r, route: name } : r))} />}
         {tab === "profile" && <ProfileTab profile={profile} setProfile={setProfile} />}
       </main>
       <nav style={styles.nav}>
@@ -867,7 +867,7 @@ function RunTab({ selectedRoute, pace, setPace, profile, previewCals, runActive,
 }
 
 // ─── STATS TAB ────────────────────────────────────────────────────────────────
-function StatsTab({ history }) {
+function StatsTab({ history, onRenameRun }) {
   const { styles } = useTheme();
   const totalCals = history.reduce((a, r) => a + r.calories, 0);
   const totalMi = history.reduce((a, r) => a + r.distanceMi, 0);
@@ -889,7 +889,13 @@ function StatsTab({ history }) {
           {history.map(run => (
             <div key={run.id} style={styles.historyCard}>
               <div style={styles.historyTop}>
-                <span style={styles.historyRoute}>{run.route}</span>
+                <input
+                  type="text"
+                  style={{ ...styles.historyRouteInput, ...styles.historyRoute }}
+                  value={run.route}
+                  onChange={(e) => onRenameRun(run.id, e.target.value)}
+                  placeholder="Run name"
+                />
                 <span style={styles.historyDate}>{run.date}</span>
               </div>
               <div style={styles.historyMeta}>
@@ -1051,8 +1057,9 @@ function getStyles(C) {
     statLabel: { fontSize: 10, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginTop: 4 },
     emptyState: { textAlign: "center", padding: "40px 20px", color: C.muted },
     historyCard: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, marginBottom: 10 },
-    historyTop: { display: "flex", justifyContent: "space-between", marginBottom: 8 },
+    historyTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 },
     historyRoute: { fontWeight: 700, fontSize: 14 },
+    historyRouteInput: { background: "transparent", border: "none", outline: "none", padding: 0, flex: 1, minWidth: 0, fontFamily: "inherit", color: "inherit" },
     historyDate: { fontSize: 11, color: C.muted },
     historyMeta: { display: "flex", gap: 14, fontSize: 12, color: C.muted, flexWrap: "wrap" },
     gpsBadge: { background: C.accentLight, color: C.accent, fontSize: 10, padding: "1px 7px", borderRadius: 10, fontWeight: 600 },
